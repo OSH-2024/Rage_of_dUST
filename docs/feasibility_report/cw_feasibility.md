@@ -11,6 +11,7 @@ Huawei LiteOS使用Kconfig文件配置系统，基于GCC/Makefile实现组件化
 
 ![complie_arch](figs/Makefile_inclusion_relationship.png)
 图1：LiteOS编译框架
+
 </center>
 不论是 Linux 下使用make menuconfig命令配置系统，还是 Windows 下使用 Huawei LiteOS Studio 进行图形化配置，Huawei LiteOS都会同时解析、展示根目录下的.config文件和tools/menuconfig/config.in文件(该文件包含了各个模块的Kconfig文件)同时在开发板的include文件夹下生成menuconfig.h,config.in文件由Kconfig语言（一种菜单配置语言）编写而成。config.in文件决定了要展示的配置项，.config文件决定了各个配置项的默认值。Huawei LiteOS通过在根目录下执行make命令完成自动化编译整个工程。对于根目录下的Makefile文件，它包含了config.mk,config.mk又包含了los_config.mk，而los_config.mk则包含了各个模块的Makefile和.config文件，从而定义了对整个工程的编译链接规则。
 
@@ -96,14 +97,14 @@ LiteOS的代码树结构如下：
 >+ .config:开发板的配置文件
 
 由于 LiteOS 工程整体太过庞大，对整个系统进行全部改写显然无法做到，鉴于小组的编程背景和改写难度，我们确定改写的总代码量约为4000-6000,在这样的考虑下，我们对每个模块进行了初步筛选，分析如下：
-##### 改写components模块的考虑：
+##### 改写components模块的考虑和分析：
 components 模块为 LiteOS 的各种组件，其中含有 fs 及 net 等组分的相关代码，整个 components 代码量非常庞大，远远超过了 kernel 部分，最初我们将 fs 列为 components 中改写的目标，但 LiteOS 带有的可以编译的 fs 一共有7个，每个都大概在400行的代码量，若只改写一个则太过于轻松，达不到通过改写体会 Rust 语言的目的，但若全部改写，则显得过于累赘，因为在menuconfig配置时不需要如此多的 fs ，只需要勾选我们想使用的即可。更进一步考虑，部分改写应选择较为独立的一部分进行改写较为妥当，且 components 中大部分组件为操作系统外围的功能性应用，改写意义不大。
 所以，我们放弃对components模块的改写。
-##### 改写shell命令的考虑：
+##### 改写shell命令的考虑和分析：
 shell 模块为 LiteOS 实现shell命令的代码，代码量约为3000行左右。
 + 改写优势：shell命令模块较为独立，可以很好的改写全部shell模块后再进行静态链接，且代码量适中。
 + 改写缺点：shell命令作为人机交互的接口，是OS外部的一层封装，用于与用户交互，在这种意义下，其对操作系统安全性的影响不大，与内核等操作系统核心模块比较，重要性略显不足。
-##### 改写kernel模块的考虑：
+##### 改写kernel模块的考虑和分析：
 kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括任务、中断、软件定时器、队列、事件、信号量、互斥锁、tick等功能，这些功能是操作系统的核心，也是操作系统在计算机中发挥最大作用的部分。
 + 改写优势：
    + 内核代码区分度高：基础内核代码分为mem , sched , 
@@ -182,6 +183,7 @@ kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括
 │  │          los_sched.c
 │  │
 │  └─shellcmd
+│
 ├─extended
 │  │  Makefile
 │  ├─cppsupport
@@ -191,6 +193,7 @@ kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括
 │  ├─lowpower
 │  ├─perf
 │  └─trace
+│
 ├─include//42 .h
 └─init
         los_init.c
@@ -217,7 +220,7 @@ kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括
 ##### 改写内存管理模块的考虑和分析
 + 改写优势：内存管理单元对于操作系统的安全性十分重要，使用Rust进行改写的意义非常大，并且mem模块的独立性也非常好，并且总代码量约为5000行左右，符合我们的改写预期。
 + 改写缺点：由于内存与安全性相关很大，如何合理使用 Rust 将 MMU 改写得更安全是很使得考虑得问题。
-##### 改写其他小源码(如事件，队列，信号量，tick等)的分析和考虑
+##### 改写其他小源码(如事件，队列，信号量，tick等)的考虑和分析
 这些部分与 mem 和 sched 模块相比，更加的零散，每个源文件基本上都是300-400的代码量，但是文件没有相互依赖性，导致后期调试与测试时需要很多单独的测试样例，比较麻烦和繁琐，故不将其作为改写对象。
 #### 小结：经过上述讨论，我们将改写的模块定位到 LiteOS 的内存管理单元
 
@@ -228,6 +231,9 @@ kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括
 ## 工作展望和规划
 ---
 ## 参考文献及相关资料
+https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Build_and_IDE.md
+https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Code_Info.md
+https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Kernel_Developer_Guide.md
 
 
 
