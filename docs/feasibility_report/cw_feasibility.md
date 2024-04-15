@@ -408,24 +408,22 @@ fn main(){
 ```
 
 + 编辑Cargo.toml:
-  
-  ```
+ ```
   [package]
   name = "first"
   version = "0.1.0"
   edition = "2021"
   build="build.rs"# package这个地方需要添加上整个构建文件build.rs以告知需要提前构建。
+  
+
+  # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+  [dependencies] # dependencies是main.rs所需要的库
+  libc ="0.2"
+
+  [build-dependencies] # build-dependencies就是关于build.rs需要的库。
+  cc ="1.0"
   ```
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies] # dependencies是main.rs所需要的库
-libc ="0.2"
-
-[build-dependencies] # build-dependencies就是关于build.rs需要的库。
-cc ="1.0"
-
-```
 + 编写主函数main .rs:
 ```Rust
 extern crate libc;//为rust准备的libc库
