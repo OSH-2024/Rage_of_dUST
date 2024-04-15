@@ -1,6 +1,6 @@
 ## 摘要
 ---
-本文为 Rage_of_dUST 小组的关于使用 Rust 改写 LiteOS 内存管理单元的可行性报告，文章先介绍了LiteOS 在Linux和Windows下的编译方法，并讨论了LiteOS 的代码树结构，分析了各个代码模块的组成和功能，详细阐述了 LiteOS 的内核代码组成，并对每个可能改写的模块改写时的优点和挑战进行了分析和评价。然后对 Rust 和 C 的相互调用的实现方式进行了阐述和说明，并讨论了实现正常编译的可行性，而且挑选了其中几个小的代码块进行了试改写，验证这样改写的可行性，最后对该项目的创新点进行的简要概述，并且对今后的工作开展和进度控制进行了展望。
+本文为 Rage_of_dUST 小组的关于使用 Rust 改写 LiteOS 内存管理单元的可行性报告，文章先介绍了LiteOS 在Linux下的编译方法，并讨论了LiteOS 的代码树结构，分析了各个代码模块的组成和功能，详细阐述了 LiteOS 的内核代码组成，并对每个可能改写的模块改写时的优点和挑战进行了分析和评价。然后对 Rust 和 C 的相互调用的实现方式进行了阐述和说明，并讨论了实现正常编译的可行性，而且挑选了其中几个小的代码块进行了试改写，验证这样改写的可行性，最后对该项目的创新点进行的简要概述，并且对今后的工作开展和进度控制进行了展望。
 ## 理论依据
 ---
 ### LiteOS 在 Linux 及 Windows下的编译方法
@@ -34,8 +34,7 @@ Huawei LiteOS使用Kconfig文件配置系统，基于GCC/Makefile实现组件化
 2. 下载完LiteOS代码后，根据实际使用情况，拷贝tools/build/config/目录下的默认配置文件${platform}.config到根目录，并重命名为.config。
 > 这里我们使用realview-pbx-a9,这是qemu所支持的架构
 3. 配置arm gcc交叉编译环境
->+ 安装GNU Arm Embedded Toolchain编译器。
-这里我们使用gcc-arm-none-eabi-9-2019-q4-major-x86_64-linux.tar.bz2
+>+ 安装GNU Arm Embedded Toolchain编译器。这里我们使用gcc-arm-none-eabi-9-2019-q4-major-x86_64-linux.tar.bz2
 >+ 解压编译器。
 `tar -xvf gcc-arm-none-eabi-9-2019-q4-major-x86_64-linux.tar.bz2`
 解压后可以得到文件夹gcc-arm-none-eabi-9-2019-q4-major。
@@ -63,7 +62,7 @@ Huawei LiteOS使用Kconfig文件配置系统，基于GCC/Makefile实现组件化
 `sudo make`
 `sudo make install`
 5. 安装python：
->+ 通过官网下载python源码包，这里我们选择Python-3.8.5.tgz
+>+ 通过官网下载python源码包。这里我们选择Python-3.8.5.tgz
 >+ 解压
 `tar -xf Python-3.8.5.tgz`
 >+ 检查依赖。
@@ -85,7 +84,7 @@ b. 链接python命令到刚刚安装的python包。
 c. 再次检查python版本。
 `python --version`
 6. 安装pip包管理工具。
->+ 命令行方式安装：
+> 命令行方式安装：
 `sudo apt-get install python3-setuptools python3-pip -y`
 `sudo pip3 install --upgrade pip`
 7. 安装kconfiglib库。
@@ -95,6 +94,7 @@ c. 再次检查python版本。
 9. qemu运行
 > 执行以下命令：
 >`qemu-system-arm -machine realview-pbx-a9 -smp 4 -m 512M -kernel out/realview-pbx-a9/Huawei_LiteOS.bin -nographic`
+> 命令解释：`-machine`选择qemu支持的模拟器，这里也就是realview-pbx-a9，`-smp 4`规定的是使用的CPU核心数，`-kernel`指使用的.bin文件，`-nographic`说明按无图形方式生成。
 10. 运行样例 
 <center> 
 
@@ -186,8 +186,8 @@ kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括
    + 代码量适中
    + kernel模块为LiteOS的核心，改写意义大
  + 改写缺点：.c文件包含了许多的.h头文件，若改写则需对这些头文件进行处理，使其可以被Rust程序使用，但鉴于现在有很多开源的Rust FFI 工具(如bindgen，将在技术依据中具体介绍做法)，所以完成相互调用是可行的。
-  
-综上讨论，我们选择 LiteOS 的kernel进行改写，下面对kernel模块内部进行分析和考虑：
+
+综上讨论，我们选择 LiteOS 的 kernel 进行改写，下面对kernel模块内部进行分析和考虑：
 #### LiteOS 内核代码树结构
 ```
 .
@@ -296,7 +296,7 @@ kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括
 + 改写优势：任务调度模块较为独立，适合进行部分改写
 + 改写缺点：任务调度模块偏重于性能和效率而并非是安全性，用 Rust 改写意义不大，且整个sched模块仅有约700行代码，工作量过于微小，不符合我们的预期。
 ##### 改写内存管理模块的考虑和分析
-+ 改写优势：内存管理单元对于操作系统的安全性十分重要，使用Rust进行改写的意义非常大，并且mem模块的独立性也非常好，并且总代码量约为5000行左右，符合我们的改写预期。
++ 改写优势：内存管理单元对于操作系统的安全性十分重要，使用Rust进行改写的意义非常大，并且mem模块的独立性也非常好，并且总代码量为4000行左右，符合我们的改写预期。
 + 改写缺点：由于内存与安全性相关很大，如何合理使用 Rust 将 MMU 改写得更安全是很使得考虑得问题。
 ##### 改写其他小源码(如事件，队列，信号量，tick等)的考虑和分析
 这些部分与 mem 和 sched 模块相比，更加的零散，每个源文件基本上都是300-400的代码量，但是文件没有相互依赖性，导致后期调试与测试时需要很多单独的测试样例，比较麻烦和繁琐，故不将其作为改写对象。
@@ -304,16 +304,115 @@ kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括
 
 ## 技术依据
 ---
+### Rust 调用 C 的可行性
+#### 通过静态链接进行调用的简单示例
++ 创建一个Rust项目
+  `cargo new first`
++ 加上外围C程序后，主文件夹的代码树如下：
+```
+.
+├─c_
+│      ctools.c
+│
+└─first
+    │  .gitignore
+    │  build.rs
+    │  Cargo.lock
+    │  Cargo.toml
+    │
+    ├─src
+    │      main.rs
+    │
+    └─target
+```
++ ctools.c代码如下：
+```C
+// ctools.c 代码
+int add(int i,int j){
+    return i+j;
+}
+int two_times(int input){
+    return input*2;
+}
+int three_times(int input){
+    return input*3;
+}
+```
++ 先在根目录创建build.rs并编辑内容：
+
+```Rust
+extern crate cc;
+
+fn main(){
+    cc::Build::new().file("../c_/ctools.c").compile("libctools.a");
+}//这里导入cc库，和c语言调用相关，并且通过Build指定好ctools.c编译后的静态库
+```
++ 编辑Cargo.toml:
+```
+[package]
+name = "first"
+version = "0.1.0"
+edition = "2021"
+build="build.rs"# package这个地方需要添加上整个构建文件build.rs以告知需要提前构建。
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies] # dependencies是main.rs所需要的库
+libc ="0.2"
+
+[build-dependencies] # build-dependencies就是关于build.rs需要的库。
+cc ="1.0"
+```
++ 编写主函数main .rs:
+```Rust
+extern crate libc;//为rust准备的libc库
+use libc::c_int;
+extern "C" {//外部声明
+    fn add(i:c_int,j:c_int)  ->c_int;
+    fn two_times(input:c_int) ->c_int;
+    fn three_times(input:c_int) ->c_int; 
+}
+
+fn main() {
+    println!("Hi guys, welcome rust ffi !");
+    let twotimes_value:i32 = unsafe{two_times(-8)};
+    println!("twotimes_value  : {:?}",twotimes_value);
+    let add_value = unsafe{add(2,3)};
+    println!("add_value       : {:?}",add_value);
+    let threetimes_value = unsafe{three_times(3)};
+    println!("threetimes_value: {:?}",threetimes_value);
+}
+```
++ 运行结果
+```
+PS D:\programming\ffi\first> cargo run
+    Finished dev [unoptimized + debuginfo] target(s) in 0.08s
+     Running `target\debug\first.exe`
+Hi guys, welcome rust ffi !
+twotimes_value  : -16
+add_value       : 5
+threetimes_value: 9
+```
+#### 使用bindgen工具进行转化
+随着Rust工程依赖的外部的C语言模块越来越来复杂，手工将C语言头文件定义的调用接口转换为Rust接口代码变得不具可操作性。幸运的是，一个名为bindgen的开源项目很好地解决了这个问题，它通过clang编译器库对C语言的头文件进行预处理，并生成相应的Rust接口。
+以下是其使用方法：
+
+                        
+
+
 ## 创新点
 ---
-## 工作展望和规划
----
+本项目旨在使用Rust语言重写HuaweiLiteOS内核中的内存管理单元，从而提高代码的安全性和可维护性。创新点在于，本项目希望能够将改写的MMU集成到C风格的LiteOS工程中，让整个OS能够正常运行并且正常实现功能，因此，使用Rust重写LiteOS内核的内存管理单元模块，是一个非常有意义的工作，它能为后来的OS的部分改写工作提供借鉴思路，并且为不同语言的代码集成技术提供了参考，但毫无疑问，集成过程无疑是困难的，这也是我们接下来的重点研究对象。
+
 ## 参考文献及相关资料
 https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Build_and_IDE.md
 https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Code_Info.md
 https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Kernel_Developer_Guide.md
 http://t.csdnimg.cn/6wjjN
 http://t.csdnimg.cn/sGqwj
+http://t.csdnimg.cn/2CbJL
+http://t.csdnimg.cn/fLKeW
+
 
 
 
