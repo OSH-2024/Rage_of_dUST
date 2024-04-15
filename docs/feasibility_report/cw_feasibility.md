@@ -28,7 +28,82 @@ Huawei LiteOS使用Kconfig文件配置系统，基于GCC/Makefile实现组件化
 > + GNU Make构建器，用于文件组织与链接。
 > + python 2.7/3.2+，pip包管理工具，kconfiglib库，用于编译前通过图形化界面完成配置。
 具体安装配置方法见参考文档
-###### Linux 下编译流程
+###### 具体配置流程和运行样例
+1. qemu-system-arm的安装
+   `sudo apt install qemu-system-arm`
+2. 下载完LiteOS代码后，根据实际使用情况，拷贝tools/build/config/目录下的默认配置文件${platform}.config到根目录，并重命名为.config。
+> 这里我们使用realview-pbx-a9,这是qemu所支持的架构
+3. 配置arm gcc交叉编译环境
+>+ 安装GNU Arm Embedded Toolchain编译器。
+这里我们使用gcc-arm-none-eabi-9-2019-q4-major-x86_64-linux.tar.bz2
+>+ 解压编译器。
+`tar -xvf gcc-arm-none-eabi-9-2019-q4-major-x86_64-linux.tar.bz2`
+解压后可以得到文件夹gcc-arm-none-eabi-9-2019-q4-major。
+>+ 添加编译器的执行路径到环境变量。
+将gcc-arm-none-eabi-9-2019-q4-major/bin目录添加到环境变量中，可以编辑~/.bashrc文件，参考如下方法设置PATH环境变量：
+`sudo vim ~/.bashrc`
+然后加入如下语句：
+`export PATH=$PATH:YOUR_PATH/gcc-arm-none-eabi-9-2019-q4-major/bin`
+然后执行以下命令使新设置的环境变量立即生效：
+`source ~/.bashrc`
+>+ 检查是否设置完毕
+`arm-none-eabi-gcc -v` 来查看版本信息
+4. 升级GNU Make构建器到最新版。
+>+ 通过官网下载最新Make构建器。这里我们选择make-4.3.tar.gz
+>+ 解压缩
+`tar -xf make-4.3.tar.gz`
+>+ 检查依赖。
+解压后进入到目录中，执行./configure命令以检查编译与安装Make构建器所需的依赖：
+`cd make-4.3`
+`./configure`
+如果没有报错就继续下一步操作，如果存在报错就根据提示安装依赖。
+>+ 编译&安装Make。
+继续在当前目录下，参考如下命令完成Make构建器的编译与安装：
+`sh build.sh`
+`sudo make`
+`sudo make install`
+5. 安装python：
+>+ 通过官网下载python源码包，这里我们选择Python-3.8.5.tgz
+>+ 解压
+`tar -xf Python-3.8.5.tgz`
+>+ 检查依赖。
+解压后进入到目录中，执行./configure命令以检查编译与安装python所需的依赖：
+`cd Python-3.8.5`
+`./configure`
+如果没有报错就继续下一步操作，如果存在报错就根据提示安装依赖。
+>+ 编译&安装python。
+`sudo make`
+`sudo make install`
+>+ 检查python版本并正确链接python命令。
+`python --version`
+如果显示的不是刚刚安装的python版本，则需要执行以下命令来正确链接python命令。
+a. 获取python目录，例如对于python 3.8.5，执行如下命令。
+`which python3.8`
+b. 链接python命令到刚刚安装的python包。
+将以下命令中的 "python3.8-path" 替换为 "which python3.8" 命令执行后的回显路径：
+`cd /usr/bin && sudo rm python && sudo ln -s "python3.8-path" python`
+c. 再次检查python版本。
+`python --version`
+6. 安装pip包管理工具。
+>+ 命令行方式安装：
+`sudo apt-get install python3-setuptools python3-pip -y`
+`sudo pip3 install --upgrade pip`
+7. 安装kconfiglib库。
+>可以直接使用如下命令安装kconfiglib：
+`sudo pip install kconfiglib`
+8. 在LiteOS 根目录执行`make`即可编译，然后在out/realview-pbx-a9会生成.bin文件
+9. qemu运行
+> 执行以下命令：
+>`qemu-system-arm -machine realview-pbx-a9 -smp 4 -m 512M -kernel out/realview-pbx-a9/Huawei_LiteOS.bin -nographic`
+10. 运行样例 
+<center> 
+
+![Run_sample](figs/Run_sample.png)
+图1：LiteOS运行样例
+
+</center>
+
+###### Linux 下编译流程概述
 1. 下载Huawei LiteOS代码。
 2. 请下载完整的Huawei LiteOS代码，代码仓在gitee上，请选择master分支进行下载。
 3. 拷贝开发板配置文件为根目录.config文件。
@@ -107,7 +182,10 @@ shell 模块为 LiteOS 实现shell命令的代码，代码量约为3000行左右
 ##### 改写kernel模块的考虑和分析：
 kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括任务、中断、软件定时器、队列、事件、信号量、互斥锁、tick等功能，这些功能是操作系统的核心，也是操作系统在计算机中发挥最大作用的部分。
 + 改写优势：
-   + 内核代码区分度高：基础内核代码分为mem , sched , 
+   + 内核代码区分度高：基础内核代码分为mem , sched , shellcmd , debug , include 及一些实现单独功能的.c文件，如中断，事件，互斥锁等，模块之间耦合度较低，便于改写。
+   + 代码量适中
+   + kernel模块为LiteOS的核心，改写意义大
+ + 改写缺点：.c文件包含了许多的.h头文件，若改写则需对这些头文件进行处理，使其可以被Rust程序使用，但鉴于现在有很多开源的Rust FFI 工具(如bindgen，将在技术依据中具体介绍做法)，所以完成相互调用是可行的。
   
 综上讨论，我们选择 LiteOS 的kernel进行改写，下面对kernel模块内部进行分析和考虑：
 #### LiteOS 内核代码树结构
@@ -234,6 +312,8 @@ kernel 模块为 LiteOS 的核心，包含了 LiteOS 基础内核代码，包括
 https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Build_and_IDE.md
 https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Code_Info.md
 https://gitee.com/LiteOS/LiteOS/blob/master/doc/LiteOS_Kernel_Developer_Guide.md
+http://t.csdnimg.cn/6wjjN
+http://t.csdnimg.cn/sGqwj
 
 
 
