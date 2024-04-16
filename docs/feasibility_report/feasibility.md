@@ -24,7 +24,7 @@
   - [Rust 调用 C 的可行性](#rust-调用-c-的可行性)
     - [通过静态链接进行调用的简单示例](#通过静态链接进行调用的简单示例)
     - [使用bindgen工具进行转化](#使用bindgen工具进行转化)
-  - [Rust 调用 C 的可行性](#rust-调用-c-的可行性-1)
+  - [C 调用 Rust 的可行性](#c-调用-rust-的可行性)
 - [创新点](#创新点)
 - [参考文献及相关资料](#参考文献及相关资料)
 
@@ -488,7 +488,7 @@ fn main() {
   + 通过cargo下载bindgen:   执行 `$ cargo install bindgen-cli`以下载, 若出错, 尝试执行`$ cargo install bindgen`并检查clang依赖是否满足.
   + 在命令行中使用bindgen:  执行`bindgen input_file -o output_file`. 即可将C头文件转化为Rust文件, 在进行调用的Rust文件起首添加`include!("output_file");` 宏命令即可.
 
-### Rust 调用 C 的可行性
+### C 调用 Rust 的可行性
 1.创建项目
 ```bash
    cargo new --lib c-to-rust #lib.rs文件和Cargo.toml
