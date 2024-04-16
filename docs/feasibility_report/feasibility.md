@@ -442,6 +442,7 @@ shell 模块为 LiteOS 实现shell命令的代码，代码量约为3000行左右
   int three_times(int input){
     return input*3;
   }
+
   ```
 
 + 先在根目录创建build.rs并编辑内容：
@@ -462,17 +463,16 @@ fn main(){
   version = "0.1.0"
   edition = "2021"
   build="build.rs"# package这个地方需要添加上整个构建文件build.rs以告知需要提前构建。
-  ```
+  
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+  #See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
   [dependencies] # dependencies是main.rs所需要的库
   libc ="0.2"
 
   [build-dependencies] # build-dependencies就是关于build.rs需要的库。
   cc ="1.0"
-
-```
+  ```
 + 编写主函数main .rs:
 ```Rust
 extern crate libc;//为rust准备的libc库
@@ -491,6 +491,20 @@ fn main() {
   println!("add_value       : {:?}",add_value);
   let threetimes_value = unsafe{three_times(3)};
   println!("threetimes_value: {:?}",threetimes_value);
+}
+
+pub const TESTNUM: u32 = 78;
+
+macro_rules! max{
+    ($x:expr, $y:expr) => {
+        {if $x > $y {$y} else {$x}}
+    }
+}
+
+pub struct card {
+    pub chara: ::std::os::raw::c_char,
+    pub years: ::std::os::raw::c_int,
+    pub point: *mut ::std::os::raw::c_void,
 }
 ```
 
@@ -546,7 +560,7 @@ rustc默认编译产生rust自用的rlib格式库，要让rustc产生动态链�
 由于rust支持重载，所以函数名会被编译器进行混淆，就像c++一样，加上这个就可以防止重名的错误，不修改函数名。
 为了能让rust的函数通过FFI(Foreign Function Interface语言交互接口)被调用，需要加上extern "C"对函数进行修饰。
 
-```
+```rust
 #![crate_type = "staticlib"]
 #[no_mangle]
 
