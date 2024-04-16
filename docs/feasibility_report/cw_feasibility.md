@@ -467,7 +467,7 @@ fn main() {
   + 通过cargo下载bindgen:   执行 `$ cargo install bindgen-cli`以下载, 若出错, 尝试执行`$ cargo install bindgen`并检查clang依赖是否满足.
   + 在命令行中使用bindgen:  执行`bindgen input_file -o output_file`. 即可将C头文件转化为Rust文件, 在进行调用的Rust文件起首添加`include!("output_file");` 宏命令即可.
 
-    ### Rust 调用 C 的可行性
+### Rust 调用 C 的可行性
 1.创建项目
 ```bash
    cargo new --lib c-to-rust #lib.rs文件和Cargo.toml
@@ -549,7 +549,13 @@ gcc -o test_c main.c lib2_3.a -lpthread -ldl
 7.直接运行生成的test_c
 ```bash
 ./test_c
-```bash
+```
+8.输出结果
+```
+ubuntu@VM7257-wrui0855:~/rust_c_demo/c-to-rust/target/debug$ ./test_c
+4 * 2 = 8
+4 * 3 = 12
+```
 1
 ## 创新点
 
