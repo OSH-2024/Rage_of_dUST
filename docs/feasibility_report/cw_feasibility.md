@@ -467,6 +467,90 @@ fn main() {
   + 通过cargo下载bindgen:   执行 `$ cargo install bindgen-cli`以下载, 若出错, 尝试执行`$ cargo install bindgen`并检查clang依赖是否满足.
   + 在命令行中使用bindgen:  执行`bindgen input_file -o output_file`. 即可将C头文件转化为Rust文件, 在进行调用的Rust文件起首添加`include!("output_file");` 宏命令即可.
 
+    ### Rust 调用 C 的可行性
+1.创建项目
+```bash
+   cargo new --lib c-to-rust #lib.rs文件和Cargo.toml
+```
+2.编辑lib.rs的内容
+```rust
+   #![crate_type = “staticlib”]
+```
+指定rustc编译成什么库类型，这里指定为静态库类型。
+rustc默认编译产生rust自用的rlib格式库，要让rustc产生动态链接库或者静态链接库，需要显式指定。
+方法1: 在文件中指定。
+在文件头加上`#![crate_type = “foo”]`, 其中foo的可选类型有bin, lib, rlib, dylib, staticlib.分别对应可执行文件，
+默认(将由rustc自己决定), rlib格式，动态链接库，静态链接库。
+方法2: 编译时给rustc 传`–crate-type`参数。参数内容同上。
+方法3: 使用cargo，指定`crate-type = [“foo”]`, foo可选类型同1。
+```rust
+#[no_mangle]
+```
+由于rust支持重载，所以函数名会被编译器进行混淆，就像c++一样，加上这个就可以防止重名的错误，不修改函数名。
+为了能让rust的函数通过FFI(Foreign Function Interface语言交互接口)被调用，需要加上extern "C"对函数进行修饰。
+```
+#![crate_type = "staticlib"]
+#[no_mangle]
+
+pub extern "C" fn double_input(input: i32) -> i32 {
+    input * 2
+}
+
+#[no_mangle]
+pub extern "C" fn third_input(input: i32) -> i32 {
+    input * 3
+}
+```
+3.编辑Cargo.toml的内容
+```
+[package]
+name = "c-to-rust"
+version = "0.1.0"
+
+[lib]
+name="2_3"
+crate-type = ["staticlib"]
+```
+4.rust编译
+完成了lib.rs和Cargo.toml之后，就可以进行编译了。
+很容易，直接用cargo，也可以写个makefile文件统一完成整个项目。
+```bash
+cargo build
+```
+会生成一个target文件，里面有我们需要的东西。
+
+5.C语言主函数的编写
+既然是c语言调用rust，那就应该是c语言里写主函数，rust里面的是函数。
+```C
+#include <stdint.h>
+#include <stdio.h>
+
+extern int32_t double_input(int32_t input);
+extern int32_t third_input(int32_t input);
+
+int main()
+{
+    int input = 4;
+    int output = double_input(input);
+    int output2 = third_input(input);
+    printf("%d * 2 = %d\n", input, output);
+    printf("%d * 3 = %d\n", input, output2);
+    return 0;
+}
+```
+这里就和写正常C语言代码差不多，有几个地方注意一下，声明一下要使用的rust函数。
+
+6.使用gcc编译C语言代码
+```bash
+gcc -o test_c main.c lib2_3.a -lpthread -ldl
+```
+使用gcc编译，-o表示生成test_c可执行文件，需要main.c和lib2_3.a两个文件进行编译。后面的-lpthread和-ldl都是和库的参数。
+
+7.直接运行生成的test_c
+```bash
+./test_c
+```bash
+1
 ## 创新点
 
 ---
