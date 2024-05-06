@@ -49,11 +49,11 @@ struct LosMultipleDlinkHead{
 pub const los_invalid_bit_index: u32 = 32;
 pub const os_bitmap_mask: u32 = 0x1f;
 
-fn Los_High_Bit_Get(bitmap: u32) -> u32{
-    if bitmap == 0{
+fn Los_High_Bit_Get(bit_map: u32) -> u32{
+    if bit_map == 0{
         return los_invalid_bit_index;
     }
-    (os_bitmap_mask - bitmap.leading_zeros())
+    (os_bitmap_mask - bit_map.leading_zeros())
 }
 
 fn OsLog2(size: u32) -> u32{
@@ -67,7 +67,7 @@ fn Os_Dlnk_Multi_Head(headaddr: *mut std::ffi::c_void, size: u32) -> *mut Los_DL
     let  dlinkhead: *mut LosMultipleDlinkHead = headaddr as *mut LosMultipleDlinkHead;
     let mut index: u32 = OsLog2(size);
     if index > Os_Max_Multi_Dlnk_Log2!() {
-        return std::ptr::null_mut()
+        return std::ptr::null_mut();
     }
     else if index <= Os_Min_Multi_Dlnk_Log2!(){
         index = Os_Min_Multi_Dlnk_Log2!();
@@ -239,7 +239,7 @@ macro_rules! Os_Mem_Set_Magic{
 macro_rules! Os_Mem_Magic_Valid{
     ($value: expr) =>{
         (($value as mut u32) ^ ((&mut $value) as mut u32) == ((-1) as mut u32))
-    }
+    };
 }
 
 
