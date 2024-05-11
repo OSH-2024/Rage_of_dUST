@@ -1,38 +1,44 @@
-include!("mempool_h.rs");
+include!("mempool.rs");
 
+use std::cell::Cell;
+//使用 Cell 可变性容器,通过 .get 方法获取值，.set 方法来修改值
 use std::mem;
-use std::ptr;
+
 //defined in los_memory.h
-pub const los_record_lr_cnt: u32 = 3;
+pub const los_record_lr_cnt: usize = 3;
 
 //defined in los_list.h
-struct Los_DL_List {
-    pst_prev: *mut Los_DL_List,
-    pst_next: *mut Los_DL_List
+struct LosDlList {
+    pst_prev: *mut LosDlList,
+    pst_next: *mut LosDlList
 }//Structure of a node in a doubly linked list
 
 #[repr(C)]
 struct LosMemCtlNode {
     prenode: *mut LosMemDynNode,
     /* Size and flag of the current node (the high two bits represent a flag,and the rest bits specify the size) */
-    size_and_flag: mut u32,
+    size_and_flag: Cell<u32>,
     //
-    gapsize: mut u32,
-    checksum: mut u32,
+    gapsize:  Cell<u32>,
+    checksum:  Cell<u32>,
     //
-    linkreg: mut [u32;los_record_lr_cnt],
+    linkreg:  [u32;los_record_lr_cnt],
     //
-    reserve2: mut u32,
+    reserve2:  Cell<u32>,
     //
-    union myunion{
-        free_node_info: Los_DL_List,
-        struct {
-            magic: mut u32,
-            taskid: mut u32,
-            //
-            moduled: mut u32
-        }
-    }
+    myunion: Myunion
+}
+
+union Myunion{
+    free_node_info: std::mem::ManuallyDrop<Cell<LosDlList>>,
+    extend_field:  std::mem::ManuallyDrop<Moreinfo>
+}
+
+struct Moreinfo{
+    magic: Cell<u32>,
+    taskid: Cell<u32>,
+    //
+    moduled: Cell<u32>
 }
 
 struct LosMemDynNode {
@@ -40,41 +46,6 @@ struct LosMemDynNode {
     //
     backup_node: LosMemCtlNode
 }
-
-//defined in los_multipledlinkhead_pri.h
-struct LosMultipleDlinkHead{
-    list_head: mut [Los_DL_List; Os_Multi_Dlnk_Num!()],
-}
-//functions in los_multipledlinkhead.c
-pub const los_invalid_bit_index: u32 = 32;
-pub const os_bitmap_mask: u32 = 0x1f;
-
-fn Los_High_Bit_Get(bit_map: u32) -> u32{
-    if bit_map == 0{
-        return los_invalid_bit_index;
-    }
-    (os_bitmap_mask - bit_map.leading_zeros())
-}
-
-fn OsLog2(size: u32) -> u32{
-    if size > 0 {
-        return Los_High_Bit_Get(size);
-    }
-    0
-}
-
-fn Os_Dlnk_Multi_Head(headaddr: *mut std::ffi::c_void, size: u32) -> *mut Los_DL_List{
-    let  dlinkhead: *mut LosMultipleDlinkHead = headaddr as *mut LosMultipleDlinkHead;
-    let mut index: u32 = OsLog2(size);
-    if index > Os_Max_Multi_Dlnk_Log2!() {
-        return std::ptr::null_mut();
-    }
-    else if index <= Os_Min_Multi_Dlnk_Log2!(){
-        index = Os_Min_Multi_Dlnk_Log2!();
-    }
-    (*dlinkhead).list_head + (index - Os_Min_Multi_Dlnk_Log2!())
-}
-
 
 macro_rules! Os_Max_Multi_Dlnk_Log2{
     () => {
@@ -91,6 +62,15 @@ macro_rules! Os_Multi_Dlnk_Num{
         (Os_Max_Multi_Dlnk_Log2!() - Os_Min_Multi_Dlnk_Log2!() +1)
     };
 }
+
+//defined in los_multipledlinkhead_pri.h
+struct LosMultipleDlinkHead{
+    list_head:  [LosDlList; Os_Multi_Dlnk_Num!()]
+}
+//functions in los_multipledlinkhead.c
+pub const los_invalid_bit_index: u32 = 32;
+pub const os_bitmap_mask: u32 = 0x1f;
+
 
 macro_rules! Os_Multi_Dlnk_Head_Size{
     () => {
@@ -117,7 +97,7 @@ macro_rules! Os_Mem_Node_Head_Size{
 
 macro_rules! Os_Mem_Min_Pool_Size{
     () => {
-        (Os_Dlnk_Head_Size!() + 2*Os_Mem_Node_Head_Size!() + mem::size_of::<LosMemPoolInfo>())
+        (Os_Dlnk_Head_Size!() + 2*Os_Mem_Node_Head_Size!() +std::mem::size_of::<LosMemPoolInfo>())
     };
 }
 
@@ -175,7 +155,7 @@ macro_rules! Os_Mem_Node_Get_Used_Flag{
     };
 }
 
-macro_rules! Os_Mem_Node_Set_Aligned_Flag{
+macro_rules! Os_Mem_Node_Set_Used_Flag{
     ($sizeandflag: expr) => {
         ($sizeandflag = ($sizeandflag | Os_Mem_Node_Used_Flag!()))
     };
@@ -195,13 +175,13 @@ macro_rules! Os_Mem_Head{
 
 macro_rules! Os_Mem_Head_Addr{
     ($pool: expr) => {
-       ((($pool as mut u32) + mem::size_of::<LosMemPoolInfo>()) as *mut std::ffi::c_void)
+       ((($pool as mut u32) + std::mem::size_of::<LosMemPoolInfo>()) as *mut std::ffi::c_void)
     };
 }
 
 macro_rules! Os_Mem_Next_Node{
     ($node: expr) =>{
-        (((($node as *mut char) + Os_Mem_Node_Get_Size!((*($node)).self_node.size_and_flag)) as *mut std::ffi::c_void) as *mut LosMemDynNode)
+        (((($node as *mut char) + Os_Mem_Node_Get_Size!((*($node)).self_node.size_and_flag.get())) as *mut std::ffi::c_void) as *mut LosMemDynNode)
     };
 }
 
