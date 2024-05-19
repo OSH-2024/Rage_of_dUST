@@ -1,35 +1,5 @@
 use core::str;
-
-//重写C头文件中宏定义
-macro_rules! LITE_OS_TEXT_MINOR{() => {}}
-
-
-macro_rules! MIN_TASK_ID{
-    ($x:expr, $y:expr) => {
-        {if $x > $y {$y} else {$x}}
-    }
-}
-macro_rules! MAX_MEM_USE{
-    ($x:expr, $y:expr) => {
-        {if $x > $y {$x} else {$y}}
-    }
-}
-
-pub const LOSCFG_BASE_CORE_TSK_LIMIT: u32 = 64;
-pub const TASK_NUM: u32 = LOSCFG_BASE_CORE_TSK_LIMIT + 1;
-//用到的结构体定义
-
-
-struct TaskMemUsedinfo {
-    memUsed: u32,
-    memPeak: u32
-}
-struct Memstat{
-    memTotalUsed: u32,
-    memTotalPeak: u32,
-    taskMemstats: [TaskMemUsedinfo; TASK_NUM()]
-}
-
+use memstat_h;
 
 LITE_OS_TEXT_MINOR!{} fn OSMemstatTaskUsedInc(mut stat: Memstat, usedSize: u32, taskId: u32){
     let record :u32 = MIN_TASK_ID!(taskId, TASK_NUM - 1); 
