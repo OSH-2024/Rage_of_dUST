@@ -291,6 +291,50 @@ unsafe fn los_membox_clr(pool: *mut (), Box: *mut ()) {
     membox_unlock(intSave);
 }
 
+unsafe fn los_show_box(pool: *mut ()) {
+    let mut index: u32;
+    let mut intSave: u32;
+    let mut boxInfo = pool as *mut LosMemboxInfo;
+    let mut node: *mut LosMemboxNode;
+
+    if Some(pool as *mut LosMemboxInfo) == None {
+        return;
+    }
+
+    membox_lock(intSave);
+    print_info(
+        "membox({:p},0x{:x},0x{:x}):\r\n",
+        pool,
+        (*boxInfo).uwBlkSize,
+        (*boxInfo).uwBlkNum,
+    );
+    print_info("free node list:\r\n");
+
+    index = 0;
+    if (*boxInfo).stFreeList.pstNext != None {
+        node = match (*boxInfo).stFreeList.pstNext {
+            Some(p) => p,
+            None => return,
+        };
+    }
+    while (*boxInfo).stFreeList.pstNext != None {
+        print_info("({},{:p})\r\n", index, node);
+        node = match (*node).pstNext {
+            Some(p) => p,
+            None => break,
+        };
+        index += 1;
+    }
+    print_info("all node list:\r\n");
+    node = boxInfo.wrapping_add(1) as *mut LosMemboxNode;
+    index = 0;
+    while index < (*boxInfo).uwBlkNum {
+        print_info("({},{:p},{:p})\r\n", index, node, (*node).pstNext);
+        index += 1;
+        node = os_membox_next(node, (*boxInfo).uwBlkSize);
+    }
+    membox_unlock(intSave);
+}
 unsafe fn los_membox_statistics_get(
     boxMem: *const (),
     maxBlk: *mut u32,
