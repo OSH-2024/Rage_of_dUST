@@ -17,3 +17,31 @@ fn Los_Mem_Realloc(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void, size
         return new_ptr;
     }
 }
+
+fn Los_Mem_Total_Used_Get(pool: *mut std::ffi::c_void) -> u32{
+    let mut tmp_node: *mut LosMemDynNode = std::ptr::null_mut();
+    let mut pool_info: *mut LosMemPoolInfo = pool as *mut LosMemPoolInfo;
+    let mut mem_used: u32 = 0;
+    let mut int_save: u32;
+    if pool == std::ptr::null_mut(){
+        return LOS_NOK;
+    }
+
+
+
+
+    mem_used
+}
+
+fn Los_Mem_Used_Blks_Get(pool: *mut std::ffi::c_void) -> u32{
+    let mut tmp_node: *mut LosMemDynNode = std::ptr::null_mut();
+    let mut pool_info: *mut LosMemPoolInfo = pool as *mut LosMemPoolInfo;
+    let mut blknums: u32 = 0;
+    let mut int_save: u32;
+    if pool == std::ptr::null_mut(){
+        return LOS_NOK;
+    }
+
+
+    blknums
+}
