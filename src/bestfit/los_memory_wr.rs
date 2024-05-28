@@ -133,60 +133,105 @@ pub fn Os_Mem_Used_Node_Show(pool: *mut std::ffi::c_void) {
     Mem_Unlock(intSave);
     //LOS_SpinLockSave(&g_memSpin, &intSave);
     //LOS_SpinUnlockRestore(&g_memSpin, &intSave);
-    //reference to Yang Yibo's code in los_membox_2.rs 
+    //reference to los_membox_2.rs 
 }
 
-//not implemented
-#[cfg(LOSCFG_KERNEL_MEM_SLAB_EXTENTION)]
-pub fn Os_Mem_Realloc_Slab(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void, isSlabMem: *mut bool, size: u32) -> *mut std::ffi::c_void {
-    let mut rc: errno_t;
-    let mut blkSz: u32;
-    let mut newPtr: *mut std::ffi::c_void = std::ptr::null_mut();
-    let mut freePtr: *mut std::ffi::c_void = ptr;
 
-    blkSz = Os_Slab_Mem_Check(pool, ptr);
-    if blkSz == u32::MAX {
-        unsafe {
-            *isSlabMem = false;
+
+/*
+the print_err macro writes an error message 
+to the standard error output, 
+including the current 
+function name and line number. 
+The first time this function 
+appears is in line 61  - Wang Rui May 28th 2024 16:16
+*/
+
+macro_rules! print_err {
+    ($($arg:tt)*) => ({
+        use std::io::Write;
+        let stderr = std::io::stderr();
+        let mut handle = stderr.lock();
+        writeln!(handle, $($arg)*).unwrap();
+    })
+}
+
+macro_rules! function_name {
+    () => {{
+        fn f() {}
+        fn type_name_of<T>(_: T) -> &'static str {
+            std::any::type_name::<T>()
         }
-        return std:ptr::null_mut();
-    }
+        &type_name_of(f)[..type_name_of(f).len() - 3]
+    }}
+}
 
-    unsafe {
-        *isSlabMem = true;
-    }
+#[cfg(LOSCFG_KERNEL_MEM_SLAB_EXTENTION)]
+fn os_mem_realloc_slab(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void, is_slab_mem: &mut bool, size: u32) -> *mut std::ffi::c_void {
+    let mut blk_sz;
+    let mut new_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+    let mut free_ptr: *mut std::ffi::c_void = ptr;
 
-    if size <= blkSz {
+    blk_sz = Os_Slab_Mem_Check(pool, ptr);
+    /*
+    This function is defined in los_slab_pri.h 
+    and has not been rewritten in Rust yet. - Wang Rui , May 28th 2024 16:03
+    */
+    if blk_sz == u32::MAX {
+        *is_slab_mem = false;
+        return std::ptr::null_mut();
+    }
+    *is_slab_mem = true;
+
+    if size <= blk_sz {
         return ptr;
     }
 
-    /* Unlock the memory spin, to allow the memory alloc API to be called */
-    unsafe {
-        LOS_Spin_Unlock(&mut g_memSpin);
-    }
+    // Unlock the memory spin, to allow the memory alloc API to be called
+    Los_Spin_Unlock(&G_MEM_SPIN);
+    /*
+    This function is defined in los_spinlock.h line 211
+    and has not been rewritten in Rust yet (too complicated). - Wang Rui , May 28th 2024 16:39
+    */
 
-    newPtr = Los_Mem_Alloc(pool, size);
-    if !newPtr.is_null() {
-        ptr::copy_nonoverlapping(new_ptr, ptr, blk_sz as usize); // Copy existing data to the new memory block
-        if rc != EOK {
-            printk!("{}[{}] memcpy_s failed, error type = {}\n", core::file!(), core::line!(), rc);
-            freePtr = newPtr;
-            newPtr = core::ptr::null_mut();
+
+    /*
+    this function is defined
+    in line 1535  - Wang Rui May 28th 2024 16:42
+    */
+    new_ptr = Los_Mem_Alloc(pool, size);
+
+    if !new_ptr.is_null() {
+
+        
+        // let rc = memcpy_s(new_ptr, size as usize, ptr, blk_sz as usize);
+        /*
+        The memcpy_s function is replaced by the std::ptr::copy_nonoverlapping function,
+        which copies blk_sz bytes from ptr to new_ptr. - by GPT-4o
+        */
+        unsafe {
+            ptr::copy_nonoverlapping(ptr, new_ptr, blk_sz as usize);
         }
-        if Los_Mem_Free(pool as *const std::ffi::c_void, freePtr) != LOS_OK {
-            printk!("{}, {}\n", core::file!(), core::line!());
+        /*
+        this function is defined
+        in line 1675  - Wang Rui May 28th 2024 16:45
+        */
+        if Los_Mem_Free(pool, free_ptr) != LOS_OK {
+            print_err!("{}[{}]\n", function_name!(), line!());
         }
     }
 
-    /* Reacquire the spin */
-    unsafe {
-        LOS_SpinLock(&mut g_memSpin);
-    }
+    // Reacquire the spin
+    Los_Spin_Lock(&G_MEM_SPIN);
 
-    newPtr
+    new_ptr
 }
 
 #[cfg(LOSCFG_KERNEL_MEM_SLAB_EXTENTION)]
-pub fn OsMemAlloc(pool: *mut core::ffi::c_void, size: u32) -> *mut core::ffi::c_void {
-    OsMemAllocWithCheck(pool, size)
+pub fn Os_Mem_Alloc(pool: *mut std::ffi::c_void, size: u32) -> *mut std::ffi::c_void {
+    Os_Mem_Alloc_With_Check(pool, size)
+    /*
+        this function is defined
+        in line 1353  - Wang Rui May 28th 2024 16:57
+    */
 }
