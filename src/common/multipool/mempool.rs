@@ -1,9 +1,13 @@
 use std::ptr;
 include!("mempool_h.rs");
+include!("mem_lock_unlock_h.rs");
+
+#[macro_use]
+mod mem_lock_unlock_h;
 
 static mut G_POOL_HEAD: *mut std::ffi::c_void = ptr::null_mut();
 //get pool size function by ourselves
-unsafe fn los_mempoolsizeget(pool: *mut std::ffi::c_void ) -> u32 {
+fn los_mempoolsizeget(pool: *mut std::ffi::c_void ) -> u32 {
     let mut heapmanager: *mut LosMemPoolInfo = std::ptr::null_mut();
     if pool.is_null() {
         return OS_NULL_INT;
@@ -12,7 +16,7 @@ unsafe fn los_mempoolsizeget(pool: *mut std::ffi::c_void ) -> u32 {
     (*heapmanager).pool_size
 }
 
-unsafe fn os_mem_mul_pool_init(pool: *mut std::ffi::c_void, size: u32) -> u32 {
+fn os_mem_mul_pool_init(pool: *mut std::ffi::c_void, size: u32) -> u32 {
     let mut next_pool = G_POOL_HEAD;
     let mut cur_pool = G_POOL_HEAD;
     while !next_pool.is_null() {
@@ -36,7 +40,7 @@ unsafe fn os_mem_mul_pool_init(pool: *mut std::ffi::c_void, size: u32) -> u32 {
     LOS_OK
 }
 
-unsafe fn os_mem_mul_pool_deinit(pool: *const std::ffi::c_void) -> u32 {
+fn os_mem_mul_pool_deinit(pool: *const std::ffi::c_void) -> u32 {
     let mut ret = LOS_NOK;
     let mut next_pool: *mut std::ffi::c_void = std::ptr::null_mut();
     let mut cur_pool: *mut std::ffi::c_void = std::ptr::null_mut();
@@ -65,28 +69,28 @@ unsafe fn os_mem_mul_pool_deinit(pool: *const std::ffi::c_void) -> u32 {
     ret
 }
 
- fn os_mem_mul_pool_head_get() -> *mut std::ffi::c_void {
+fn os_mem_mul_pool_head_get() -> *mut std::ffi::c_void {
     unsafe { G_POOL_HEAD }
 }
 
-/*unsafe fn los_mem_de_init(pool: *mut std::ffi::c_void) -> u32 {
-    let ret: u32;
-    let int_save: u32;
-
-    MEM_LOCK(int_save);
+fn los_mem_de_init(pool: *mut std::ffi::c_void) -> u32 {
+    let mut ret: u32;
+    let mut int_save: u32;
+    Mem_Lock!(int_save);
     ret = os_mem_mul_pool_deinit(pool);
-    MEM_UNLOCK(int_save);
-
+    Mem_Unlock!(int_save);
     ret
-}*/
+}
 
-unsafe fn los_mem_pool_list() -> u32 {
+fn los_mem_pool_list() -> u32 {
     let mut next_pool = unsafe {G_POOL_HEAD};
     let mut index = 0;
     while !next_pool.is_null() {
         println!("pool{} :size--{}  starting address--{:p}", index, (*(next_pool as *mut LosMemPoolInfo)).pool_size, (*(next_pool as *mut LosMemPoolInfo)).pool);
         index += 1;
-        //os_mem_info_print(next_pool);
+        /*********/
+        Os_Mem_Info_Print(next_pool);
+        /*********/
         unsafe { next_pool = (*(next_pool as *mut LosMemPoolInfo)).next_pool };
     }
     index
