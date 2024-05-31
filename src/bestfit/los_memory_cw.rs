@@ -1,5 +1,7 @@
 include!("los_memory_h.rs");
-
+/*********/
+//以下带有/*********/的函数为未实现的函数
+/*********/
 
 fn Los_Mem_Realloc(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void, size: u32) -> *mut std::ffi::c_void{
     let mut int_save: u32;
@@ -53,8 +55,19 @@ fn Los_Mem_Total_Used_Get(pool: *mut std::ffi::c_void) -> u32{
         return LOS_NOK;
     }
 
+    Mem_Lock!(int_save);
+    //
+    let mut tmp_node = Os_Mem_First_Node!(pool);
+    while tmp_node <= Os_Mem_End_Node!(pool, pool_info.pool_size) {
+    // 在这里处理 tmp_node 指向的节点
+        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag) {
+            mem_used += Os_Mem_Node_Get_Size!(tmp_node.self_node.size_and_flag);
+        }
+    // 获取下一个节点
+        tmp_node = Os_Mem_Next_Node!(tmp_node);
+    }
 
-
+    Mem_Unlock!(int_save);
 
     mem_used
 }
@@ -68,6 +81,19 @@ fn Los_Mem_Used_Blks_Get(pool: *mut std::ffi::c_void) -> u32{
         return LOS_NOK;
     }
 
+    Mem_Lock!(int_save);
+    //
+    let mut tmp_node = Os_Mem_First_Node!(pool);
+    while tmp_node <= Os_Mem_End_Node!(pool, pool_info.pool_size) {
+    // 在这里处理 tmp_node 指向的节点
+        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag) {
+            blknums++;
+        }
+    // 获取下一个节点
+        tmp_node = Os_Mem_Next_Node!(tmp_node);
+    }
+
+    Mem_Unlock!(int_save);
 
     blknums
 }
@@ -84,8 +110,19 @@ fn Los_Mem_Free_Blks_Get(pool: *mut std::ffi::c_void) -> u32{
     if pool == std::ptr::null_mut() {
         return LOS_NOK;
     }
+
     Mem_Lock!(int_save);
-    for 
+    //
+    let mut tmp_node = Os_Mem_First_Node!(pool);
+    while tmp_node <= Os_Mem_End_Node!(pool, pool_info.pool_size) {
+    // 在这里处理 tmp_node 指向的节点
+        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag) == 0 {
+            blknums++;
+        }
+    // 获取下一个节点
+        tmp_node = Os_Mem_Next_Node!(tmp_node);
+    }
+
     Mem_Unlock!(int_save);
 
     blknums
@@ -99,10 +136,10 @@ fn Los_Mem_Last_Used_Get(pool: *mut std::ffi::c_void) -> u32{
     }
     node = (*(Os_Mem_End_Node!(pool, (*pool_info).pool_size))).self_node.prenode;
     if Os_Mem_Node_Get_Used_Flag!((*node).self_node.size_and_flag.get()) {
-        return ((node as *mut char + Os_Mem_Node_Get_Size!((*node).self_node.size_and_flag.get()) + std::mem::size_of()<LosMemDynNode>) as u32);
+        return ((node as *mut char + Os_Mem_Node_Get_Size!((*node).self_node.size_and_flag.get()) + std::mem::size_of::<LosMemDynNode>()) as u32);
     }
     else {
-        return ((node as *mut char + std::mem::size_of()<LosMemDynNode>) as u32);
+        return ((node as *mut char + std::mem::size_of::<LosMemDynNode>()) as u32);
     }
 }
 
@@ -110,7 +147,7 @@ fn Os_Mem_Reset_End_Node(pool: *mut std::ffi::c_void, pre_addr: u32) ->(){
     let end_node: *mut LosMemDynNode = (Os_Mem_End_Node!(pool, (*(pool as *mut LosMemPoolInfo)).pool_size)) as *mut LosMemDynNode;
     (*end_node).self_node.size_and_flag.set(Os_Mem_Node_Head_Size!());
     if pre_addr != 0 {
-        (*end_node).self_node.prenode = (pre_addr - std::mem::size_of()<LosMemDynNode>) as *mut LosMemDynNode;
+        (*end_node).self_node.prenode = (pre_addr - std::mem::size_of::<LosMemDynNode>()) as *mut LosMemDynNode;
     }
 
     Os_Mem_Node_Set_Used_Flag!((*end_node).self_node.size_and_flag.get());
@@ -159,4 +196,51 @@ fn Os_Show_Free_Node(index: u32, length: u32, count_num: *u32) ->(){
     for count in 0..= length-1 {
         println!("  {:<5}", count_num[count + index]);
     }
+}
+
+fn Los_Mem_Free_Node_Show(pool: *mut std::ffi::c_void) -> u32{
+    let list_node_head: *mut LosDlList = std::ptr::null_mut();
+    let head_addr: *mut LosMultipleDlinkHead = (pool as u32 + std::mem::size_of::<LosMemPoolInfo>()) as *mut LosMultipleDlinkHead;
+    let pool_info: *mut LosMemPoolInfo = pool as *mut LosMemPoolInfo;
+    let mut link_head_index: u32;
+    let mut count_num: [u32; Os_Multi_Dlnk_Num!()] = [0; Os_Multi_Dlnk_Num!()];
+    let mut int_save: u32;
+
+    if (pool == std::ptr::null_mut()) || (pool as u32 != (pool_info.pool) as u32) {
+        println!("wrong mem pool addr: {:p}, line:{}\n", pool_info, line!());
+        return LOS_NOK;
+    }
+
+    println!("\n   ************************ left free node number**********************");
+    Mem_Lock!(int_save);
+
+    for link_head_index in 0 ..= Os_Multi_Dlnk_Num!() - 1 {
+        list_node_head = head_addr.list_head[link_head_index].pst_next;
+        while list_node_head != &mut (head_addr.list_head[link_head_index]) {
+            list_node_head = list_node_head.pst_next;
+            count_num[link_head_index]++;
+        }
+    }
+
+    link_head_index = 0;
+    while link_head_index < Os_Multi_Dlnk_Num {
+        if link_head_index + Column!() < Os_Multi_Dlnk_Num!() {
+            //Column!()  未定义 8
+            /*********/
+            Os_Show_Free_Node(link_head_index, Column!(), count_num);
+            /*********/
+            link_head_index += Column!();
+        }
+        else {
+            /*********/
+            Os_Show_Free_Node(link_head_index, (Os_Multi_Dlnk_Num!() - 1 - link_head_index), count_num);
+            /*********/
+            break;
+        }
+    }
+
+    Mem_Unlock!(int_save);
+    println!("\n   ********************************************************************\n\n");
+
+    LOS_OK;
 }
