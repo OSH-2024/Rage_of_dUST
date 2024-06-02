@@ -99,6 +99,48 @@ fn Los_Mem_Used_Blks_Get(pool: *mut std::ffi::c_void) -> u32{
 }
 
 fn Los_Mem_Task_Id_Get(ptr: *mut std::ffi::c_void) -> u32{
+    let tmp_node: *mut LosMemDynNode = std::ptr::null_mut();
+    //m_auc_sys_mem1: UINT8 *
+    let pool_info: *mut LosMemPoolInfo = (m_auc_sys_mem1 as *mut std::ffi::c_void) as *mut LosMemPoolInfo;
+    let mut int_save: u32;
+    //LOSCFG_EXC_INTERACTION
+    if ptr < m_auc_sys_mem1 as *mut std::ffi::c_void {
+        pool_info = (m_auc_sys_mem0 as *mut std::ffi::c_void) as *mut LosMemPoolInfo
+    }
+    //
+
+    if ((ptr == std::ptr::null_mut()) || 
+        (ptr < Os_Mem_First_Node!(pool_info) as *mut std::ffi::c_void) ||
+        (ptr > Os_Mem_End_Node!(pool_info, pool_info.pool_size) as *mut std::ffi::c_void)){
+        println!("input ptr {:p} is out of system memory range[{:p}, {:p}]\n", ptr, Os_Mem_First_Node!(pool_info), 
+                    Os_Mem_End_Node!(pool_info, pool_info.pool_size));
+        return OS_INVALID;
+        //(UINT32)(-1)
+    }
+
+    Mem_Lock!(int_save);
+
+    let mut tmp_node = Os_Mem_First_Node!(pool);
+    while tmp_node <= Os_Mem_End_Node!(pool, pool_info.pool_size) {
+    // 在这里处理 tmp_node 指向的节点
+        if ptr as u32 < tmp_node as u32 {
+            if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.prenode.self_node.size_and_flag) {
+                Mem_Unlock!(int_save);
+                return tmp_node.self_node.prenode.self_node.taskid;
+            }
+            else {
+                Mem_Unlock!(int_save);
+                println!("input ptr {:p} is belong to a free mem node\n", ptr);
+                return OS_INVALID;
+            }
+        }
+    // 获取下一个节点
+        tmp_node = Os_Mem_Next_Node!(tmp_node);
+    }
+
+    Mem_Unlock!(int_save);
+    return OS_INVALID;
+
 
 }
 
@@ -244,3 +286,26 @@ fn Los_Mem_Free_Node_Show(pool: *mut std::ffi::c_void) -> u32{
 
     LOS_OK;
 }
+
+//LOSCFG_BASE_MEM_NODE_SIZE_CHECK
+fn Los_Mem_Node_Size_Check(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void, total_size: *mut u32, avail_size: *mut u32) -> u32 {
+
+}
+
+fn Os_Mem_Find_Node_Ctrl(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void) -> *mut *mut std::ffi::c_void {
+
+}
+
+fn Los_Mem_Check_Level_Set(check_level: u8) -> u32{
+    if check_level == Los_Mem_Check_Level_Low!() {
+        
+    }
+}
+fn Los_Mem_Check_Level_Get() -> u8{
+    g_mem_check_level
+}
+
+fn Os_Mem_Sys_Node_Check(dst_addr: *mut std::ffi::c_void, src_addr: *mut std::ffi::c_void, node_length: u32, pos: u8)->u32{
+
+}
+
