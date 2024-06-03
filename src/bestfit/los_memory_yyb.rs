@@ -7,6 +7,41 @@ macro_rules! print_err {
         }
     };
 }
+use std::cell::Cell;
+#[repr(C)]
+pub struct LosMemCtlNode {
+    prenode: *mut LosMemDynNode,
+    /* Size and flag of the current node (the high two bits represent a flag,and the rest bits specify the size) */
+    size_and_flag: Cell<u32>,
+    //
+    gapsize: Cell<u32>,
+    checksum: Cell<u32>,
+    //
+    linkreg: [u32; los_record_lr_cnt],
+    //
+    reserve2: Cell<u32>,
+    //
+    myunion: Myunion,
+}
+pub union Myunion {
+    free_node_info: std::mem::ManuallyDrop<Cell<LosDlList>>,
+    extend_field: std::mem::ManuallyDrop<Moreinfo>,
+}
+
+pub struct Moreinfo {
+    magic: Cell<u32>,
+    taskid: Cell<u32>,
+    //
+    moduled: Cell<u32>,
+}
+
+pub struct LosMemDynNode {
+    #[cfg(LOSCFG_MEM_HEAD_BACKUP)]
+    backup_node: LosMemCtlNode,
+
+    self_node: LosMemCtlNode,
+}
+
 #[allow(unused_macros)]
 macro_rules! node_dump_size {
     () => {
@@ -39,7 +74,7 @@ const m_aucSysMem1: Option<Box<u8>> = None;
 type MallocHook = fn() -> ();
 static mut g_MALLOC_HOOK: Option<MallocHook> = None;
 
-use std::arch::asm;
+use std::arch::asm; //?
 #[link_section = ".data.init"]
 static mut G_SYS_MEM_ADDR_END: usize = 0;
 
@@ -60,76 +95,74 @@ fn Os_Mem_Node_Save(node: &mut LosMemDynNode) {
 
 #[inline]
 fn os_mem_taskid_set(node: &mut LosMemDynNode, task_id: u32) {
-    node.selfNode.taskId = task_id;
+    node.self_node.taskId = task_id;
 
-    #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
+    #[cfg(LOSCFG_MEM_HEAD_BACKUP)]
     {
         Os_Mem_Node_Save(node);
     }
 }
 
-// pub const fn os_mem_taskid_get(node: &LosMemDynNode) -> u32 {
-//     node.selfNode.taskId
-// }
+pub const fn os_mem_taskid_get(node: &LosMemDynNode) -> u32 {
+    node.self_node.taskid
+}
 
-// #[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
-// mod mem_mul_module {
-//     use crate::LosMemDynNode;
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
+mod mem_mul_module {
+    use crate::LosMemDynNode;
 
-//     #[inline]
-//     pub fn os_mem_modid_set(node: &mut LosMemDynNode, module_id: u32) {
-//         node.selfNode.moduleId = module_id;
+    #[inline]
+    pub fn os_mem_modid_set(node: &mut LosMemDynNode, module_id: u32) {
+        node.selfNode.moduleId = module_id;
 
-//         #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
-//         {
-//             os_mem_node_save(node);
-//         }
-//     }
+        #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
+        {
+            os_mem_node_save(node);
+        }
+    }
 
-//     #[inline]
-//     pub fn os_mem_modid_get(node: &LosMemDynNode) -> u32 {
-//         node.selfNode.moduleId
-//     }
+    #[inline]
+    pub fn os_mem_modid_get(node: &LosMemDynNode) -> u32 {
+        node.selfNode.moduleId
+    }
 
-//     #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
-//     fn os_mem_node_save(node: &mut LosMemDynNode) {
-//         // TODO
-//     }
-// }
+    #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
+    fn os_mem_node_save(node: &mut LosMemDynNode) {
+        // TODO
+    }
+}
 
-// #[cfg(any(feature = "LOSCFG_MEM_DEBUG", feature = "LOSCFG_MEM_TASK_STAT"))]
-// mod mem_debug_task_stat {
-//     use crate::{LosMemDynNode, LosTaskCB, OsCurrTaskGet, OS_INT_INACTIVE, TASK_NUM};
+#[cfg(any(feature = "LOSCFG_MEM_DEBUG", feature = "LOSCFG_MEM_TASK_STAT"))]
+mod mem_debug_task_stat {
+    use crate::{LosMemDynNode, LosTaskCB, OsCurrTaskGet, OS_INT_INACTIVE, TASK_NUM};
 
-//     #[inline]
-//     pub fn os_mem_set_magic_num_and_task_id(node: &mut LosMemDynNode) {
-//         if let Some(run_task) = OsCurrTaskGet() {
-//             os_mem_set_magic(node);
-//             if OS_INT_INACTIVE {
-//                 os_mem_taskid_set(node, run_task.taskId);
-//             } else {
-//                 os_mem_taskid_set(node, TASK_NUM - 1);
-//             }
-//         }
-//     }
+    #[inline]
+    pub fn os_mem_set_magic_num_and_task_id(node: &mut LosMemDynNode) {
+        if let Some(run_task) = OsCurrTaskGet() {
+            os_mem_set_magic(node);
+            if OS_INT_INACTIVE {
+                os_mem_taskid_set(node, run_task.taskid);
+            } else {
+                os_mem_taskid_set(node, TASK_NUM - 1);
+            }
+        }
+    }
 
-//     #[inline]
-//     fn os_mem_set_magic(node: &mut LosMemDynNode) {
-//         // TODO
-//     }
+    #[inline]
+    fn os_mem_set_magic(node: &mut LosMemDynNode) {
+        // TODO
+    }
 
-//     #[inline]
-//     fn os_mem_taskid_set(node: &mut LosMemDynNode, task_id: u32) {
-//         node.selfNode.taskId = task_id;
-//     }
-// }
+    #[inline]
+    fn os_mem_taskid_set(node: &mut LosMemDynNode, task_id: u32) {
+        node.self_node.taskid = task_id;
+    }
+}
 
-// #[cfg(not(any(feature = "LOSCFG_MEM_DEBUG", feature = "LOSCFG_MEM_TASK_STAT")))]
-// mod mem_debug_task_stat {
-//     use crate::LosMemDynNode;
+#[cfg(not(any(feature = "LOSCFG_MEM_DEBUG", feature = "LOSCFG_MEM_TASK_STAT")))]
+mod mem_debug_task_stat {
+    use crate::LosMemDynNode;
 
-//     #[inline]
-//     pub fn os_mem_set_magic_num_and_task_id(_node: &mut LosMemDynNode) {
-//         // 如果未定义LOSCFG_MEM_DEBUG和LOSCFG_MEM_TASK_STAT feature，则什么都不做
-//     }
-// }
+    #[inline]
+    pub fn os_mem_set_magic_num_and_task_id(_node: &mut LosMemDynNode) {}
+}
