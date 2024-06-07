@@ -135,15 +135,41 @@ fn Os_Mem_Info_Print(pool: *const c_void){
     }
 }
 
+#[inline]
 fn Os_Mem_Info_Alert(pool: *const c_void, alloc_size: u32){
     #[cfg(feature = "loscfg_mem_debug")]{
-        print_err("---------------------------------------------------\
+        Print_Err("---------------------------------------------------\
         --------------------------------------------------------");
         Os_Mem_Info_Print(pool);
         Print_Err(&format!(
         "[{}] No suitable free block, require free node size: 0x{:x}",
         std::module_path!(), alloc_size));
-        print_err("---------------------------------------------------\
+        Print_Err("---------------------------------------------------\
                 --------------------------------------------------------");
+    }
+}
+
+/*
+ * Description : Allocate node from Memory pool
+ * Input       : pool  --- Pointer to memory pool
+ *               size  --- Size of memory in bytes to allocate
+ * Return      : Pointer to allocated memory
+ */
+fn Os_Mem_Alloc_With_Check(pool: &mut LosMemPoolInfo, size: u32) 
+    -> *mut c_void{
+    let mut alloc_node: *mut LosMemDynNode = ptr::null_mut();
+    let alloc_size: usize;
+
+    #[cfg(feature = "loscfg_base_mem_node_integrity_check")]{
+        let mut tmp_node = std::ptr::null_mut();
+        let mut pre_node = std::ptr::null_mut();
+    }
+    let first_node = (Os_Mem_Head_Addr!(pool) as *mut u8).wrapping_add(OS_DLNK_HEAD_SIZE) as *const ();
+
+    #[cfg(feature = "loscfg_base_mem_node_integrity_check")]{
+        if(Os_Mem_Integrity_Check(pool, &mut tmp_node, &mut pre_node)){
+            Os_Mem_Integrity_Check_Error(tmp_node, pre_node);
+            return None;
+        }
     }
 }
