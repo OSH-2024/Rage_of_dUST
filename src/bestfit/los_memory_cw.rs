@@ -124,9 +124,9 @@ fn Los_Mem_Task_Id_Get(ptr: *mut std::ffi::c_void) -> u32{
     while tmp_node <= Os_Mem_End_Node!(pool, pool_info.pool_size) {
     // 在这里处理 tmp_node 指向的节点
         if ptr as u32 < tmp_node as u32 {
-            if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.prenode.self_node.size_and_flag) {
+            if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.prenode.self_node.size_and_flag.get()) {
                 Mem_Unlock!(int_save);
-                return tmp_node.self_node.prenode.self_node.taskid;
+                return tmp_node.self_node.prenode.self_node.myunion.extend_field.taskid.get();
             }
             else {
                 Mem_Unlock!(int_save);
@@ -139,8 +139,7 @@ fn Los_Mem_Task_Id_Get(ptr: *mut std::ffi::c_void) -> u32{
     }
 
     Mem_Unlock!(int_save);
-    return OS_INVALID;
-
+    OS_INVALID
 
 }
 
@@ -158,7 +157,7 @@ fn Los_Mem_Free_Blks_Get(pool: *mut std::ffi::c_void) -> u32{
     let mut tmp_node = Os_Mem_First_Node!(pool);
     while tmp_node <= Os_Mem_End_Node!(pool, pool_info.pool_size) {
     // 在这里处理 tmp_node 指向的节点
-        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag) == 0 {
+        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag.get()) == 0 {
             blknums++;
         }
     // 获取下一个节点
@@ -284,28 +283,101 @@ fn Los_Mem_Free_Node_Show(pool: *mut std::ffi::c_void) -> u32{
     Mem_Unlock!(int_save);
     println!("\n   ********************************************************************\n\n");
 
-    LOS_OK;
+    LOS_OK
 }
 
 //LOSCFG_BASE_MEM_NODE_SIZE_CHECK
 fn Los_Mem_Node_Size_Check(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void, total_size: *mut u32, avail_size: *mut u32) -> u32 {
+    let head: *mut std::ffi::c_void = std::ptr::null_mut();
 
+    
 }
 
-fn Os_Mem_Find_Node_Ctrl(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void) -> *mut *mut std::ffi::c_void {
+fn Os_Mem_Find_Node_Ctrl(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void) -> *mut std::ffi::c_void {
+    let head: *mut std::ffi::c_void = ptr;
 
+    if ptr == std::ptr::null_mut() {
+        return std::ptr::null_mut();
+    }
+
+    head = Os_Mem_Align(head, Os_Mem_Align_Size!());
+    while !Os_Mem_Magic_Valid!((head as *mut LosMemDynNode).self_node.myunion.extend_field.magic.get()) {
+        head = (head as *mut u8 - std::mem::size_of()<*mut char>) as *mut std::ffi::c_void;
+        if head <= pool {
+            return std::ptr::null_mut();
+        }
+    }
+
+    head
 }
 
 fn Los_Mem_Check_Level_Set(check_level: u8) -> u32{
+    //low 0
     if check_level == Los_Mem_Check_Level_Low!() {
-        
+        println!("{:s}: LOS_MEM_CHECK_LEVEL_LOW \n", __FUNCTION__);
     }
+    //high 1
+    else if check_level == Los_Mem_Check_Level_High!() {
+        println!("{:s}: LOS_MEM_CHECK_LEVEL_HIGH \n", __FUNCTION__);
+    }
+    else if check_level == Los_Mem_Check_Level_Disable!() {
+        println!("{:s}: LOS_MEM_CHECK_LEVEL_DISABLE \n", __FUNCTION__);
+    }
+    else {
+        println!("{:s}: wrong param, setting failed !! \n", __FUNCTION__);
+        return Los_Errno_Memcheck_Wrong_Level!();
+        /////
+    }
+    g_mem_check_level = check_level;
+
+    LOS_OK
+
 }
 fn Los_Mem_Check_Level_Get() -> u8{
     g_mem_check_level
 }
 
 fn Os_Mem_Sys_Node_Check(dst_addr: *mut std::ffi::c_void, src_addr: *mut std::ffi::c_void, node_length: u32, pos: u8)->u32{
+    let mut ret: u32;
+    let mut total_size: u32 = 0;
+    let mut avail_size; u32 = 0;
+    let pool: *mut u8 = m_auc_sys_mem1;
+    //LOSCFG_EXC_INTERACTION
+    if dst_addr as u32 < m_auc_sys_mem0 as u32 + g_excinteract_memsize {
+        pool = m_auc_sys_mem0;
+    }
+    //
+    ret = Los_Mem_Node_Size_Check(pool, dst_addr, &mut total_size, &mut avail_size);
+    if (ret == LOS_OK) && (node_length > avail_size) {
+        println!("---------------------------------------------\n"
+                "{:s}: dst inode availSize is not enough availSize = 0x{:x}, memcpy length = 0x{:x}\n",
+                ((pos == 0) ? "memset" : "memcpy"), avail_size, node_length);
+        //Os_Back_Trace();
+        println!("---------------------------------------------\n");
+        return LOS_NOK;
+    }
 
+    if pos == -1 {
+        //LOSCFG_EXC_INTERACTION
+        if src_addr as u32 < m_auc_sys_mem0 as u32 + g_excinteract_memsize {
+            pool = m_auc_sys_mem0;
+        }
+        else {
+            pool = m_auc_sys_mem1;
+        }
+        //
+        ret = Los_Mem_Node_Size_Check(pool, src_addr, &mut total_size, &mut avail_size);
+        if ((ret == LOS_OK) && (node_length > avail_size)) {
+            println!("---------------------------------------------\n");
+            println!("memcpy: src inode availSize is not enough"
+                      " availSize = 0x{:x}, memcpy length = 0x{:x}\n",
+                      avail_size, node_length);
+            //OsBackTrace();
+            println!("---------------------------------------------\n");
+            return LOS_NOK;
+        }
+    }
+
+    LOS_OK
 }
 
