@@ -86,3 +86,64 @@ fn Os_Mem_Info_Get(pool: *const c_void, pool_status: &mut Los_Mem_Pool_Status) -
         LOS_OK
     }
 }
+
+fn Os_Mem_Info_Print(pool: *const c_void){
+    unsafe{
+        let pool_info = &*(pool as *const Los_Mem_Pool_Info);
+        let mut status: LosMemPoolStatus = Default::default();
+
+        if(Os_Mem_Info_Get(pool, status) == LOS_NOK){
+            return;
+        }
+        #[cfg(feature = "loscfg_mem_task_stat")]{
+            println!(
+                "pool addr          pool size    used size     free size    max free node size   used node num     free node num      UsageWaterLine"
+            );
+            println!(
+                "---------------    --------     -------       --------     --------------       -------------      ------------      ------------"
+            );
+            println!(
+                "{:16p}   0x{:08x}   0x{:08x}    0x{:08x}   0x{:016x}   0x{:013x}    0x{:013x}    0x{:013x}",
+                pool_info.pool,
+                pool_info.pool_size,
+                status.uw_total_used_size,
+                status.uw_total_free_size,
+                status.uw_max_free_node_size,
+                status.uw_used_node_num,
+                status.uw_free_node_num,
+                status.uw_usage_water_line
+            );
+        }
+        #[cfg(not(feature = "loscfg_mem_task_stat"))]{
+            println!(
+                "pool addr          pool size    used size     free size    max free node size   used node num     free node num"
+            );
+            println!(
+                "---------------    --------     -------       --------     --------------       -------------      ------------"
+            );
+            println!(
+                "{:16p}   0x{:08x}   0x{:08x}    0x{:08x}   0x{:016x}   0x{:013x}    0x{:013x}",
+                pool_info.pool,
+                pool_info.pool_size,
+                status.uw_total_used_size,
+                status.uw_total_free_size,
+                status.uw_max_free_node_size,
+                status.uw_used_node_num,
+                status.uw_free_node_num
+            );
+        }
+    }
+}
+
+fn Os_Mem_Info_Alert(pool: *const c_void, alloc_size: u32){
+    #[cfg(feature = "loscfg_mem_debug")]{
+        print_err("---------------------------------------------------\
+        --------------------------------------------------------");
+        Os_Mem_Info_Print(pool);
+        Print_Err(&format!(
+        "[{}] No suitable free block, require free node size: 0x{:x}",
+        std::module_path!(), alloc_size));
+        print_err("---------------------------------------------------\
+                --------------------------------------------------------");
+    }
+}
