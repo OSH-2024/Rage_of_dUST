@@ -172,4 +172,27 @@ fn Os_Mem_Alloc_With_Check(pool: &mut LosMemPoolInfo, size: u32)
             return None;
         }
     }
+    alloc_size = Os_Mem_Align(size + OS_MEM_NODE_HEAD_SIZE!(), OS_MEM_ALIGN_SIZE!());
+    alloc_node = Os_Mem_Find_Suitable_Free_Block(pool, alloc_size);
+    if alloc_node.is_null() {
+        Os_Mem_Info_Alert(pool, alloc_size);
+        return None;
+    }
+    if alloc_size + OS_MEM_NODE_HEAD_SIZE!() + OS_MEM_ALIGN_SIZE!() <= (*alloc_node).self_node.size_and_flag {
+        Os_Mem_Split_Node(pool, alloc_node, alloc_size);
+    }
+    Os_Mem_List_Delete(&mut (*alloc_node).self_node.free_node_info, first_node);
+    Os_Mem_Set_Magic_Num_And_Task_Id(alloc_node);
+    Os_Mem_Node_Set_Used_Flag(&mut (*alloc_node).self_node.size_and_flag);
+    Os_Mem_Add_Used(&mut pool.stat, Os_Mem_Node_Get_Size((*alloc_node).self_node.size_and_flag),
+                    Os_Mem_Task_Id_Get(alloc_node));
+    Os_Mem_Node_Debug_Operate(pool, alloc_node, size);
+
+    #[cfg(feature = "LOSCFG_KERNEL_LMS")]
+    {
+        if !g_lms_malloc_hook.is_null() {
+            g_lms_malloc_hook(unsafe { alloc_node.offset(1) });
+        }
+    }
+    Some(unsafe { alloc_node.offset(1) })
 }

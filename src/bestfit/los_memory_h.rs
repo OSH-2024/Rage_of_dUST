@@ -9,3 +9,9 @@ struct LosMemPoolStatus{
     uw_usage_waterline: Cell<u32>
 
 }//LOS_MEM_POOL_STATUS
+
+macro_rules! OS_MEM_ALIGN_SIZE{
+    () => {
+        std::mem::size_of::<usize>()
+    };
+}
