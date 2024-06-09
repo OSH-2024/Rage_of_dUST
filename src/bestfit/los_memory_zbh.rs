@@ -172,13 +172,13 @@ fn Os_Mem_Alloc_With_Check(pool: &mut LosMemPoolInfo, size: u32)
             return None;
         }
     }
-    alloc_size = Os_Mem_Align(size + OS_MEM_NODE_HEAD_SIZE!(), OS_MEM_ALIGN_SIZE!());
+    alloc_size = Os_Mem_Align(size + Os_Mem_Node_Head_Size!(), Os_Mem_Align_Size!());
     alloc_node = Os_Mem_Find_Suitable_Free_Block(pool, alloc_size);
     if alloc_node.is_null() {
         Os_Mem_Info_Alert(pool, alloc_size);
         return None;
     }
-    if alloc_size + OS_MEM_NODE_HEAD_SIZE!() + OS_MEM_ALIGN_SIZE!() <= (*alloc_node).self_node.size_and_flag {
+    if alloc_size + Os_Mem_Node_Head_Size!() + Os_Mem_Align_Size!() <= (*alloc_node).self_node.size_and_flag {
         Os_Mem_Split_Node(pool, alloc_node, alloc_size);
     }
     Os_Mem_List_Delete(&mut (*alloc_node).self_node.free_node_info, first_node);
@@ -195,4 +195,29 @@ fn Os_Mem_Alloc_With_Check(pool: &mut LosMemPoolInfo, size: u32)
         }
     }
     Some(unsafe { alloc_node.offset(1) })
+}
+
+/*
+ * Description : reAlloc a smaller memory node
+ * Input       : pool      --- Pointer to memory pool
+ *               allocSize --- the size of new node which will be alloced
+ *               node      --- the node which will be realloced
+ *               nodeSize  --- the size of old node
+ * Output      : node      --- pointer to the new node after realloc
+ */
+#[inline]
+fn Os_Mem_ReAlloc_Smaller(pool: &mut LosMemPoolInfo, alloc_size: u32, node: &mut LosMemDynNode, nodeSize: u32){
+    if alloc_size + OS_MEM_NODE_HEAD_SIZE!() + OS_MEM_ALIGN_SIZE!() <= node_size {
+        node.self_node.size_and_flag = node_size;
+        Os_Mem_Split_Node(pool, node, alloc_size);
+        Os_Mem_Node_Set_Used_Flag!(node.self_node.size_and_flag)
+        
+        #[cfg(feature = "loscfg_mem_head_backup")]
+        Os_Mem_Node_Save(node);
+
+        Os_Mem_Reduce_Used(&mut pool.stat, node_size - alloc_size, Os_Mem_Task_Id_Get(node));
+    }
+
+    #[cfg(feature = "loscfg_mem_leakcheck")]
+    Os_Mem_Link_Register_Record(node);
 }
