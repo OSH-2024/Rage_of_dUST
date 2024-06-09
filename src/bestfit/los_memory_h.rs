@@ -10,7 +10,7 @@ struct LosMemPoolStatus{
 
 }//LOS_MEM_POOL_STATUS
 
-macro_rules! OS_MEM_ALIGN_SIZE{
+macro_rules! Os_Mem_Align_Size{
     () => {
         std::mem::size_of::<usize>()
     };
