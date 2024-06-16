@@ -207,7 +207,7 @@ fn Os_Mem_Alloc_With_Check(pool: &mut LosMemPoolInfo, size: u32)
  */
 #[inline]
 fn Os_Mem_ReAlloc_Smaller(pool: &mut LosMemPoolInfo, alloc_size: u32, node: &mut LosMemDynNode, nodeSize: u32){
-    if alloc_size + OS_MEM_NODE_HEAD_SIZE!() + OS_MEM_ALIGN_SIZE!() <= node_size {
+    if alloc_size + Os_Mem_Node_Head_Size!() + Os_Mem_Align_Size!() <= node_size {
         node.self_node.size_and_flag = node_size;
         Os_Mem_Split_Node(pool, node, alloc_size);
         Os_Mem_Node_Set_Used_Flag!(node.self_node.size_and_flag)
@@ -234,21 +234,22 @@ fn Os_Mem_ReAlloc_Smaller(pool: &mut LosMemPoolInfo, alloc_size: u32, node: &mut
 
 #[inline]
 fn Os_Mem_Merge_Node_For_ReAlloc_Bigger(pool: &mut LosMemPoolInfo, alloc_size: u32, node: &mut LosMemDynNode, node_size: u32, next_node: &mut LosMemDynNode){
-    
-    let next_node_size = Os_Mem_Node_Get_Size(next_node.self_node.size_and_flag);
-    let total_size = node_size + next_node_size;
-    let alloc_size = Os_Mem_Align(alloc_size + OS_MEM_NODE_HEAD_SIZE!(), OS_MEM_ALIGN_SIZE!());
-    if total_size >= alloc_size {
-        Os_Mem_List_Delete(&mut next_node.self_node.free_node_info, Os_Mem_Head_Addr!(pool) as *const ());
-        Os_Mem_Merge_Node(pool, node, next_node);
-        if total_size - alloc_size >= OS_MEM_NODE_HEAD_SIZE!() + OS_MEM_ALIGN_SIZE!() {
-            Os_Mem_Split_Node(pool, node, alloc_size);
-        }
-        Os_Mem_Node_Set_Used_Flag!(node.self_node.size_and_flag);
-        #[cfg(feature = "loscfg_mem_head_backup")]
-        Os_Mem_Node_Save(node);
-        Os_Mem_Reduce_Used(&mut pool.stat, total_size - alloc_size, Os_Mem_Task_Id_Get(node));
+    let first_node = (Os_Mem_Head_Addr!(pool) as *mut u8).add(Os_Dlnk_Head_Size!()) as *const ();
+
+    node.self_node.size_and_flag.set(node_size);
+    Os_Mem_List_Delete(&mut next_node.self_node.free_node_info, first_node);
+    Os_Mem_Merge_Node(next_node);
+    if alloc_size + Os_Mem_Node_Head_Size!() + Os_Mem_Align_Size!() <= node.self_node.size_and_flag {
+        Os_Mem_Split_Node(pool, node, alloc_size);
     }
+    //TODO:该宏定义在memstat_pri中
+    Os_Mem_Add_Used!(&mut pool.stat, node.self_node.size_and_flag - node_size, Os_Mem_Task_Id_Get(node));
+
+    Os_Mem_Node_Set_Used_Flag!(node.self_node.size_and_flag);
+
+    #[cfg(feature = "loscfg_mem_head_backup")]
+    Os_Mem_Node_Save(node);
+
     #[cfg(feature = "loscfg_mem_leakcheck")]
     Os_Mem_Link_Register_Record(node);
 }
