@@ -4,6 +4,18 @@ include!("los_memory_internal_h.rs");
 #[macro_use]
 mod los_memory_internal_h;
 
+macro_rules! Os_Multi_Dlnk_Head_Size {
+    () => {
+        std::mem::size_of::<LosMultipleDlinkHead>()
+    };
+}
+
+macro_rules! Os_Dlnk_Head_Size {
+    () => {
+        Os_Multi_Dlnk_Head_Size!()
+    };
+}
+
 fn Los_List_Init(list: *mut LosDlList)->(){
     (*list).pst_next = list;
     (*list).pst_prev = list;
