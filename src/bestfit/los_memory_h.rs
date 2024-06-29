@@ -10,11 +10,6 @@ struct LosMemPoolStatus{
 
 }//LOS_MEM_POOL_STATUS
 
-macro_rules! Os_Mem_Align_Size{
-    () => {
-        std::mem::size_of::<usize>()
-    };
-}
 macro_rules! Los_Mem_Check_Level_High {
     {} => {
         1
@@ -54,6 +49,50 @@ macro_rules! Los_Errno_Os_Error {
 macro_rules! Los_Errno_Memcheck_Wrong_Level {
     {} => {
         Los_Errno_Os_Error!(Los_Mod_Mem, 0x4)
+        //枚举
     };
 }
+
+macro_rules! Los_Errno_Memcheck_Disabled {
+    {} => {
+        Los_Errno_Os_Error!(Los_Mod_Mem, 0x5)
+    }
+}
+
+macro_rules! Los_Errno_Memcheck_Para_Null {
+    {} => {
+        Los_Errno_Os_Error!(Los_Mod_Mem, 0x1)
+    }
+}
+
+macro_rules! Los_Errno_Memcheck_Outside {
+    {} => {
+        Los_Errno_Os_Error!(Los_Mod_Mem, 0x2)
+    }
+}
+
+macro_rules! Los_Errno_Memcheck_No_Head {
+    {} => {
+        Los_Errno_Os_Error!(Los_Mod_Mem, 0x3)
+    }
+}
+
+macro_rules! Os_Mem_Align_Size {
+    {} => {
+        std::mem::size_of::<u32>()
+    }
+}
+
+macro_rules! Mem_Module_Max {
+    {} => {
+        0x20
+    }
+}
+
+macro_rules! Os_Null_Int {
+    {} => {
+        0xFFFFFFFF as u32
+    }
+}
+
 
