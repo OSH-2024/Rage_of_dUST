@@ -60,8 +60,8 @@ fn Los_Mem_Total_Used_Get(pool: *mut std::ffi::c_void) -> u32{
     let mut tmp_node = Os_Mem_First_Node!(pool);
     while tmp_node <= Os_Mem_End_Node!(pool, pool_info.pool_size) {
     // 在这里处理 tmp_node 指向的节点
-        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag) {
-            mem_used += Os_Mem_Node_Get_Size!(tmp_node.self_node.size_and_flag);
+        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag.get()) {
+            mem_used += Os_Mem_Node_Get_Size!(tmp_node.self_node.size_and_flag.get());
         }
     // 获取下一个节点
         tmp_node = Os_Mem_Next_Node!(tmp_node);
@@ -86,7 +86,7 @@ fn Los_Mem_Used_Blks_Get(pool: *mut std::ffi::c_void) -> u32{
     let mut tmp_node = Os_Mem_First_Node!(pool);
     while tmp_node <= Os_Mem_End_Node!(pool, pool_info.pool_size) {
     // 在这里处理 tmp_node 指向的节点
-        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag) {
+        if Os_Mem_Node_Get_Used_Flag!(tmp_node.self_node.size_and_flag.get()) {
             blknums++;
         }
     // 获取下一个节点
@@ -103,11 +103,13 @@ fn Los_Mem_Task_Id_Get(ptr: *mut std::ffi::c_void) -> u32{
     //m_auc_sys_mem1: UINT8 *
     let pool_info: *mut LosMemPoolInfo = (m_auc_sys_mem1 as *mut std::ffi::c_void) as *mut LosMemPoolInfo;
     let mut int_save: u32;
-    //LOSCFG_EXC_INTERACTION
-    if ptr < m_auc_sys_mem1 as *mut std::ffi::c_void {
-        pool_info = (m_auc_sys_mem0 as *mut std::ffi::c_void) as *mut LosMemPoolInfo
+
+    #[cfg(feature = "LOSCFG_EXC_INTERACTION")]
+    {
+        if ptr < m_auc_sys_mem1 as *mut std::ffi::c_void {
+            pool_info = (m_auc_sys_mem0 as *mut std::ffi::c_void) as *mut LosMemPoolInfo
+        }
     }
-    //
 
     if ((ptr == std::ptr::null_mut()) || 
         (ptr < Os_Mem_First_Node!(pool_info) as *mut std::ffi::c_void) ||
@@ -194,7 +196,11 @@ fn Os_Mem_Reset_End_Node(pool: *mut std::ffi::c_void, pre_addr: u32) ->(){
     Os_Mem_Node_Set_Used_Flag!((*end_node).self_node.size_and_flag.get());
     /*********/
     Os_Mem_Set_Magic_Num_And_Task_ID(end_node);
-    Os_Mem_Node_Save(end_node);
+
+    #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
+    {
+        Os_Mem_Node_Save(end_node);
+    }
     /*********/
 }
 
@@ -265,12 +271,11 @@ fn Los_Mem_Free_Node_Show(pool: *mut std::ffi::c_void) -> u32{
 
     link_head_index = 0;
     while link_head_index < Os_Multi_Dlnk_Num {
-        if link_head_index + Column!() < Os_Multi_Dlnk_Num!() {
-            //Column!()  未定义 8
+        if link_head_index + Column_Num!() < Os_Multi_Dlnk_Num!() {
             /*********/
-            Os_Show_Free_Node(link_head_index, Column!(), count_num);
+            Os_Show_Free_Node(link_head_index, Column_Num!(), count_num);
             /*********/
-            link_head_index += Column!();
+            link_head_index += Column_Num!();
         }
         else {
             /*********/
@@ -286,7 +291,7 @@ fn Los_Mem_Free_Node_Show(pool: *mut std::ffi::c_void) -> u32{
     LOS_OK
 }
 
-//LOSCFG_BASE_MEM_NODE_SIZE_CHECK
+#[cfg(feature = "LOSCFG_BASE_MEM_NODE_SIZE_CHECK")]
 fn Los_Mem_Node_Size_Check(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void, total_size: *mut u32, avail_size: *mut u32) -> u32 {
     let head: *mut std::ffi::c_void = std::ptr::null_mut();
     let pool_info: *mut LosMemPoolInfo = pool as *mut LosMemPoolInfo;
@@ -333,6 +338,7 @@ fn Los_Mem_Node_Size_Check(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_vo
 
 }
 
+#[cfg(feature = "LOSCFG_BASE_MEM_NODE_SIZE_CHECK")]
 fn Os_Mem_Find_Node_Ctrl(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void) -> *mut std::ffi::c_void {
     let head: *mut std::ffi::c_void = ptr;
 
@@ -351,6 +357,7 @@ fn Os_Mem_Find_Node_Ctrl(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void
     head
 }
 
+#[cfg(feature = "LOSCFG_BASE_MEM_NODE_SIZE_CHECK")]
 fn Los_Mem_Check_Level_Set(check_level: u8) -> u32{
     //low 0
     if check_level == Los_Mem_Check_Level_Low!() {
@@ -373,20 +380,26 @@ fn Los_Mem_Check_Level_Set(check_level: u8) -> u32{
     LOS_OK
 
 }
+
+#[cfg(feature = "LOSCFG_BASE_MEM_NODE_SIZE_CHECK")]
 fn Los_Mem_Check_Level_Get() -> u8{
     g_mem_check_level
 }
 
+#[cfg(feature = "LOSCFG_BASE_MEM_NODE_SIZE_CHECK")]
 fn Os_Mem_Sys_Node_Check(dst_addr: *mut std::ffi::c_void, src_addr: *mut std::ffi::c_void, node_length: u32, pos: u8)->u32{
     let mut ret: u32;
     let mut total_size: u32 = 0;
     let mut avail_size; u32 = 0;
     let pool: *mut u8 = m_auc_sys_mem1;
-    //LOSCFG_EXC_INTERACTION
-    if dst_addr as u32 < m_auc_sys_mem0 as u32 + g_excinteract_memsize {
-        pool = m_auc_sys_mem0;
+
+    #[cfg(feature = "LOSCFG_EXC_INTERACTION")]
+    {
+        if dst_addr as u32 < m_auc_sys_mem0 as u32 + g_exc_interact_mem_size {
+            pool = m_auc_sys_mem0;
+        }
     }
-    //
+
     ret = Los_Mem_Node_Size_Check(pool, dst_addr, &mut total_size, &mut avail_size);
     if (ret == LOS_OK) && (node_length > avail_size) {
         println!("---------------------------------------------\n"
@@ -398,14 +411,15 @@ fn Os_Mem_Sys_Node_Check(dst_addr: *mut std::ffi::c_void, src_addr: *mut std::ff
     }
 
     if pos == -1 {
-        //LOSCFG_EXC_INTERACTION
-        if src_addr as u32 < m_auc_sys_mem0 as u32 + g_excinteract_memsize {
-            pool = m_auc_sys_mem0;
+        #[cfg(feature = "LOSCFG_EXC_INTERACTION")]
+        {
+            if src_addr as u32 < m_auc_sys_mem0 as u32 + g_exc_interact_mem_size {
+                pool = m_auc_sys_mem0;
+            }
+            else {
+                pool = m_auc_sys_mem1;
+            }
         }
-        else {
-            pool = m_auc_sys_mem1;
-        }
-        //
         ret = Los_Mem_Node_Size_Check(pool, src_addr, &mut total_size, &mut avail_size);
         if ((ret == LOS_OK) && (node_length > avail_size)) {
             println!("---------------------------------------------\n");
@@ -421,7 +435,7 @@ fn Os_Mem_Sys_Node_Check(dst_addr: *mut std::ffi::c_void, src_addr: *mut std::ff
     LOS_OK
 }
 
-//LOSCFG_MEM_MUL_MODULE
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
 fn Os_Mem_Mod_Check(moduleid: u32) -> u32{
     if moduleid > Mem_Module_Max!() {
         println!("error module ID input!\n");
@@ -430,6 +444,7 @@ fn Os_Mem_Mod_Check(moduleid: u32) -> u32{
     return LOS_OK
 }
 
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
 fn Os_Mem_Ptr_To_Node(ptr: *mut std::ffi::c_void()) -> *mut std::ffi::c_void() {
     let mut gapsize: u32;
     if (ptr as u32) & (Os_Mem_Align_Size!() - 1) {
@@ -456,6 +471,7 @@ fn Os_Mem_Ptr_To_Node(ptr: *mut std::ffi::c_void()) -> *mut std::ffi::c_void() {
     return 
 }
 
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
 fn Os_Mem_Node_Size_Get(ptr: *mut std::ffi::c_void()) -> u32 {
     let node: *mut LosMemDynNode = Os_Mem_Ptr_To_Node(ptr) as *mut LosMemDynNode;
     if node == std::ptr::null_mut() {
@@ -465,6 +481,7 @@ fn Os_Mem_Node_Size_Get(ptr: *mut std::ffi::c_void()) -> u32 {
     return Os_Mem_Node_Get_Size!(node.self_node.size_and_flag.get());
 }
 
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
 fn Los_Mem_M_Alloc(pool: *mut std::ffi::c_void(), size: u32, moduleid: u32) -> *mut std::ffi::c_void() {
     let mut int_save: u32;
     let ptr: *mut std::ffi::c_void() = std::ptr::null_mut();
@@ -486,6 +503,7 @@ fn Los_Mem_M_Alloc(pool: *mut std::ffi::c_void(), size: u32, moduleid: u32) -> *
     ptr
 }
 
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
 fn Los_Mem_M_Alloc_Align(pool: *mut std::ffi::c_void(), size: u32, boundary: u32, moduleid: u32) -> *mut std::ffi::c_void() {
     let mut int_save: u32;
     let ptr: *mut std::ffi::c_void() = std::ptr::null_mut();
@@ -508,6 +526,7 @@ fn Los_Mem_M_Alloc_Align(pool: *mut std::ffi::c_void(), size: u32, boundary: u32
 
 }
 
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
 fn Los_Mem_M_Free(pool: *mut std::ptr::null_mut(), ptr: *mut std::ptr::null_mut(), moduleid: u32) -> u32{
     let mut int_save: u32;
     let mut ret: u32;
@@ -540,6 +559,7 @@ fn Los_Mem_M_Free(pool: *mut std::ptr::null_mut(), ptr: *mut std::ptr::null_mut(
     return ret;
 }
 
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
 fn Los_Mem_M_Realloc(pool: *mut std::ffi::c_void(), ptr: *mut std::ffi::c_void(), size: u32, moduleid: u32) -> *mut std::ffi::c_void() {
     let new_ptr: *mut std::ffi::c_void() = std::ptr::null_mut();
     let mut old_node_size: u32;
@@ -583,6 +603,8 @@ fn Los_Mem_M_Realloc(pool: *mut std::ffi::c_void(), ptr: *mut std::ffi::c_void()
     }
     return new_ptr;
 }
+
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
 fn Los_Mem_M_Used_Get(moduleid: u32) -> u32{
     if Os_Mem_Mod_Check(moduleid) == LOS_NOK {
         return Os_Null_Int!();
