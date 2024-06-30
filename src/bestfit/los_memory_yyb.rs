@@ -362,7 +362,7 @@ unsafe fn Os_Mem_Node_Prev_Get(pool:*std::ffi::c_void,node:&mut LosMemDynNode)->
             println!("[//TODE:function name]the backup node information of current node is bad !!");    
             Os_Mem_Disp_Ctl_Node(&(*node_cur).backup_node);
             
-            if node_pre.is_null()
+            if !node_pre.is_null()
             {
                 println!("the detailed information of previous node:");
                 Os_Mem_Disp_More_Details(node_pre);
@@ -393,4 +393,220 @@ unsafe fn Os_Mem_Node_Prev_Get(pool:*std::ffi::c_void,node:&mut LosMemDynNode)->
 }
 
 //395
-unsafe fn Os_Mem_Node_Prev_Try_Get(pool:*mut std::ffi::c_void,)
+unsafe fn Os_Mem_Node_Prev_Try_Get(pool:*mut std::ffi::c_void,node:*mut *mut LosMemDynNode,ptr:*mut std::ffi::c_void)->*mut LosMemDynNode{
+    let node_should_be:u32;
+    let node_cur:*mut LosMemDynNode=Os_Mem_First_Node!(pool);
+    let pool_info:*mut LosMemPoolInfo=pool as *mut LosMemPoolInfo;
+    let node_pre:*mut LosMemDynNode=Os_Mem_End_Node(pool,(*pool_info).pool_size);
+
+    while node_cur<Os_Mem_End_Node!(pool,(*pool_info).pool_size)
+    {
+        if !Os_Mem_Checksum_Verify(&(*node_cur).self_node)
+        {
+            println!("[//TODO:function name]the node information of current node is bad !!");
+            Os_Mem_Disp_Ctl_Node(&(*node_cur).self_node);
+
+            println!("the detailed information of previous node:");
+            Os_Mem_Disp_More_Details(node_pre);
+
+            //due to the every step's checksum verify, nodePre is trustful
+            if Os_Mem_Backup_Do_Restore(pool,node_pre,node_cur)!=0//LOS_OK
+            {
+                return ptr::null_mut();
+            }
+        }
+
+        if !Os_Mem_Checksum_Verify(&(*node_cur).backup_node)
+        {
+            println!("[//TODO:function name]the backup node information of current node is bad !!");
+            Os_Mem_Disp_Ctl_Node(&(*node_cur).backup_node);
+
+            if !node_pre.is_null()
+            {
+                println!("the detailed information of previous node:");
+                Os_Mem_Disp_More_Details(node_pre);
+            }
+
+            if Os_Mem_Backup_Do_Restore(pool,node_pre,node_cur)!=0//LOS_NOK
+            {
+                return ptr::null_mut();
+            }
+        }
+
+        node_should_be=(node_cur as u32)+(*node_cur).self_node.gapsize+std::mem::size_of::<LosMemDynNode>();
+        if node_should_be==ptr as u32
+        {
+            *node=node_cur;
+            return node_pre;
+        }
+
+        if Os_Mem_Next_Node!(node_cur)>ptr as *mut LosMemDynNode
+        {
+            break;
+        }
+
+        node_pre=node_cur
+
+        node_cur=Os_Mem_Next_Node!(node_cur);
+    }
+
+    return ptr::null_mut();
+}
+
+//449
+unsafe fn Os_Mem_Backup_Try_Restore(pool:*mut std::ffi::c_void,node:*mut *mut LosMemDynNode,ptr:*mut std::ffi::c_void)->u32
+{
+    let node_head:*mut LosMemDynNode=std::ptr::null_mut();
+    let node_pre:*mut LosMemDynNode=Os_Mem_Node_Prev_Try_Get(pool,&node_head as *mut *mut LosMemDynNode,ptr);
+
+    if node_pre.is_null()
+    {
+        return 1;//LOS_NOK
+    }
+
+    *node=node_head;
+    return Os_Mem_Backup_Do_Restore(pool,node_pre as &mut LosMemDynNode,*node);
+}
+
+//461
+unsafe fn Os_Mem_Backup_Restore(pool:*mut std::ffi::c_void,node:*mut LosMemDynNode)->u32
+{
+    let node_pre:*mut LosMemDynNode=Os_Mem_Node_Prev_Get(pool,node);
+
+    if node_pre.is_null()
+    {
+        return 1;//LOS_NOK
+    }
+
+    return Os_Mem_Backup_Do_Restore(pool,node_pre as &mut LosMemDynNode,node);
+}
+
+//471
+unsafe fn Os_Mem_Backup_Check_And_Restore(pool:*mut std::ffi::c_void,node:*mut LosMemDynNode,ptr:*mut std::ffi::c_void)->u32
+{
+    let pool_info:*mut LosMemPoolInfo=pool as *mut LosMemPoolInfo;
+    let start_node:*mut LosMemDynNode=Os_Mem_First_Node!(pool);
+    let end_node:*mut LosMemDynNode=Os_Mem_End_Node!(pool,(*pool_info).pool_size);
+
+    if Os_Mem_Middle_Addr!(start_node,node,end_node)
+    {
+        //GapSize is bad or node is broken, we need to verify & try to restore
+        if !Os_Mem_Checksum_Verify(&(*node).self_node)
+        {
+            node = (ptr as u32 - Os_Mem_Node_Head_Size!()) as *mut LosMemDynNode;
+            return Os_Mem_Backup_Try_Restore(pool,&node,ptr);
+        }
+    }
+    return 0;//LOS_OK
+}
+
+//487
+unsafe fn Os_Mem_Set_Gap_Size(ctl_node:*mut LosMemCtlNode,gap_size:u32)
+{
+    (*ctl_node).gap_size=gap_size;
+}
+
+//492
+unsafe fn Os_Mem_Node_Save(node:*mut LosMemDynNode)
+{
+    Os_Mem_Set_Gap_Size(&(*node).self_node as *mut LosMemCtlNode,0);
+    Os_Mem_Checksum_Set(&(*node).self_node as *mut LosMemCtlNode);
+    Os_Mem_Backup_Setup(node);
+}
+
+//499
+unsafe fn Os_Mem_Node_Save_With_Gap_Size(node:*mut LosMemDynNode,gap_size:u32)
+{
+    Os_Mem_Set_Gap_Size(&(*node).self_node as *mut LosMemCtlNode,gap_size);
+    Os_Mem_Checksum_Set(&(*node).self_node as *mut LosMemCtlNode);
+    Os_Mem_Backup_Setup(node);
+}
+
+//506
+unsafe fn Os_Mem_List_Delete(node:*mut LOS_DL_LIST,first_node:*mut std::ffi::c_void)
+{
+    dyn_node:*mut LosMemDynNode=std::ptr::null_mut();
+
+    (*(*node).pst_next).pst_prev=(*node).pst_prev;
+    (*(*node).pst_prev).pst_next=(*node).pst_next;
+
+    if (*node).pst_next as  std::ffi::c_void>=first_node
+    {
+        dyn_node=Los_Dl_List_Entry!((*node).pst_next,LosMemDynNode,self_node.free_node_info);
+        Os_Mem_Node_Save(dyn_node);
+    }
+    if (*node).pst_prev as std::ffi::c_void>=first_node
+    {
+        dyn_node=Los_Dl_List_Entry!((*node).pst_prev,LosMemDynNode,self_node.free_node_info);
+        Os_Mem_Node_Save(dyn_node);
+    }
+
+    (*node).pst_next=std::ptr::null_mut();
+    (*node).pst_prev=std::ptr::null_mut();
+
+    dyn_node=Los_Dl_List_Entry!(node,LosMemDynNode,self_node.free_node_info);
+    Os_Mem_Node_Save(dyn_node);
+}
+
+//530
+unsafe fn Os_MEM_List_Add(list_node:*mut LOS_DL_LIST,node:*mut LOS_DL_LIST,first_node:*mut std::ffi::c_void)
+{
+    dyn_node:*mut LosMemDynNode=std::ptr::null_mut();
+
+    (*node).pst_next=(*list_node).pst_next;
+    (*node).pst_prev=list_node;
+    
+    dyn_node=Los_Dl_List_Entry!(node,LosMemDynNode,self_node.free_node_info);
+    Os_Mem_Node_Save(dyn_node);
+
+    (*(*list_node).pst_next).pst_prev=node;
+    if (*list_node).pst_next as std::ffi::c_void>=first_node
+    {
+        dyn_node=Los_Dl_List_Entry!((*list_node).pst_next,LosMemDynNode,self_node.free_node_info);
+        Os_Mem_Node_Save(dyn_node);
+    }
+
+    (*list_node).pst_next=node;
+}
+
+//549
+unsafe fn Los_Mem_Bad_Node_Show(pool:*mut std::ffi::c_void)
+{
+    let node_pre:*mut LosMemDynNode=std::ptr::null_mut();
+    let tmp_node:*mut LosMemDynNode=std::ptr::null_mut();
+    let pool_info:*mut LosMemPoolInfo=pool as *mut LosMemPoolInfo;
+    let int_save:u32;
+
+    if pool.is_null()
+    {
+        return;
+    }
+
+    Mem_Lock(int_save);
+
+    tmp_node=Os_Mem_First_Node!(pool);
+    while tmp_node<=Os_Mem_End_Node!(pool,(*pool_info).pool_size)
+    {
+        if Os_Mem_Checksum_Verify(&(*tmp_node).self_node as *mut LosMemCtlNode)
+        {
+            tmp_node=Os_Mem_Next_Node!(tmp_node);
+            continue;
+        }
+
+        node_pre=Os_Mem_Node_Prev_Get(pool,tmp_node);
+        if node_pre.is_null()
+        {
+            println!("the current node is invalid, but cannot find its previous Node");
+            tmp_node=Os_Mem_Next_Node!(tmp_node);
+            continue;
+        }
+        
+        println!("the detailed information of previous node:");
+        Os_Mem_Disp_More_Details(node_pre);
+
+        tmp_node=Os_Mem_Next_Node!(tmp_node);
+    }
+
+    Mem_Unlock(int_save);
+    println!("check finish");
+}
