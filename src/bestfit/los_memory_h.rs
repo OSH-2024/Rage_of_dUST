@@ -95,4 +95,18 @@ macro_rules! Os_Null_Int {
     }
 }
 
+//los_memory.c 56
+macro_rules! Node_Dump_Size {
+    () => {
+        64
+    };
+}
+
+//los_memory.c 57
+macro_rules! Column_Num {
+    () => {
+        8
+    };
+}
+
 
