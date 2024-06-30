@@ -20,8 +20,8 @@ macro_rules! print_err {
 //     };
 // }
 //69
-static mut m_aucSysMem0: *mut u8=0 as *mut u8;
-static mut m_aucSysMem1: *mut u8=0 as *mut u8;
+static mut m_auc_sys_mem0: *mut u8=0 as *mut u8;
+static mut m_auc_sys_mem1: *mut u8=0 as *mut u8;
 
 type MallocHook = fn();
 static mut g_malloc_hook: Option<MallocHook> = None;
