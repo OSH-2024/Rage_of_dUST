@@ -7,54 +7,6 @@ macro_rules! print_err {
         }
     };
 }
-use std::cell::Cell;
-#[repr(C)]
-pub struct LosMemCtlNode {
-    prenode: *mut LosMemDynNode,
-    /* Size and flag of the current node (the high two bits represent a flag,and the rest bits specify the size) */
-    size_and_flag: Cell<u32>,
-    //
-    gapsize: Cell<u32>,
-    checksum: Cell<u32>,
-    //
-    linkreg: [u32; los_record_lr_cnt],
-    //
-    reserve2: Cell<u32>,
-    //
-    myunion: Myunion,
-}
-pub union Myunion {
-    free_node_info: std::mem::ManuallyDrop<Cell<LosDlList>>,
-    extend_field: std::mem::ManuallyDrop<Moreinfo>,
-}
-
-pub struct Moreinfo {
-    magic: Cell<u32>,
-    taskid: Cell<u32>,
-    //
-    moduled: Cell<u32>,
-}
-
-pub struct LosMemDynNode {
-    #[cfg(LOSCFG_MEM_HEAD_BACKUP)]
-    backup_node: LosMemCtlNode,
-
-    self_node: LosMemCtlNode,
-}
-
-#[allow(unused_macros)]
-macro_rules! node_dump_size {
-    () => {
-        64
-    };
-}
-#[allow(unused_macros)]
-macro_rules! column_num {
-    () => {
-        8
-    };
-}
-
 // use std::panic::Location; //用于获取行数
 // extern crate stdext;
 // use stdext::function_name; //用于获取函数名
@@ -68,25 +20,25 @@ macro_rules! column_num {
 //     };
 // }
 //69
-const m_aucSysMem0: Option<Box<u8>> = None;
-const m_aucSysMem1: Option<Box<u8>> = None;
+static mut m_aucSysMem0: *mut u8=0 as *mut u8;
+static mut m_aucSysMem1: *mut u8=0 as *mut u8;
 
-type MallocHook = fn() -> ();
-static mut g_MALLOC_HOOK: Option<MallocHook> = None;
+type MallocHook = fn();
+static mut g_malloc_hook: Option<MallocHook> = None;
 
 use std::arch::asm; //?
 #[link_section = ".data.init"]
-static mut G_SYS_MEM_ADDR_END: usize = 0;
+static mut g_sys_mem_addr_end: usize = 0;
 
 #[cfg(feature = "LOSCFG_EXC_INTERACTION")]
 #[link_section = ".data.init"]
-static mut G_EXC_INTERACT_MEM_SIZE: usize = 0;
+static mut g_exc_interact_mem_size: usize = 0;
 
 #[cfg(feature = "LOSCFD_BASE_MEM_NODE_SIZE_CHECK")]
-static mut G_MEM_CHECK_LEVEL: u8 = 0xff; //LOS_MEM_CHECK_LEVEL_DEFAULT
+static mut g_mem_check_level: u8 = 0xff; //LOS_MEM_CHECK_LEVEL_DEFAULT
 
-#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
-static mut G_MODULE_MEM_USED_SIZE: [u32; MEM_MODULE_MAX + 1] = [0; MEM_MODULE_MAX + 1];
+#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]//MEM_MODULE_MAX=0x20
+static mut g_module_mem_used_size: [u32; 0x20 + 1] = [0; 0x20 + 1];
 
 #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_Node_Save(node: &mut LosMemDynNode) {
@@ -439,3 +391,6 @@ unsafe fn Os_Mem_Node_Prev_Get(pool:*std::ffi::c_void,node:&mut LosMemDynNode)->
 
     return ptr::null_mut();
 }
+
+//395
+unsafe fn Os_Mem_Node_Prev_Try_Get(pool:*mut std::ffi::c_void,)
