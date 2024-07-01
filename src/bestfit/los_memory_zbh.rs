@@ -514,3 +514,65 @@ fn Los_Mem_Free(pool: *mut c_void, ptr: *mut c_void) -> u32 {
     Los_Trace!(MEM_FREE, pool, ptr as u32);
     ret
 }
+
+fn Os_Get_Real_Ptr(pool: *const c_void, ptr: *mut c_void) -> *mut c_void {
+    let mut real_ptr: *mut c_void = ptr;
+    let mut gap_size: u32 = *((ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32);
+
+    if Os_Mem_Node_Get_Aligned_Flag!(gap_size) && Os_Mem_Node_Get_Used_Flag!(gap_size) {
+        eprintln!("[{}:{}]: gapSize:0x{:x} error", "Os_Get_Real_Ptr()", line!(), gap_size);
+        return std::ptr::null_mut();
+    }
+    if Os_Mem_Node_Get_Aligned_Flag!(gap_size) {
+        gap_size = Os_Mem_Node_Get_Aligned_Gapsize!(gap_size);
+        if (gap_size & (Os_Mem_Align_Size!() - 1)) != 0 ||
+            gap_size > (ptr as u32 - Os_Mem_Node_Head_Size!() - pool as u32) {
+            eprintln!("[{}:{}]: gapSize:0x{:x} error", "Os_Get_Real_Ptr()", line!(), gap_size);
+            return std::ptr::null_mut();
+        }
+        real_ptr = (ptr as u32 - gap_size) as *mut c_void;
+    }
+    real_ptr
+}
+
+fn Os_Mem_Realloc(pool: *mut c_void, ptr: *mut c_void, size: u32) -> *mut c_void {
+    let mut node: *mut LosMemDynNode = std::ptr::null_mut();
+    let mut next_node: *mut LosMemDynNode = std::ptr::null_mut();
+    let mut tmp_ptr: *mut c_void = std::ptr::null_mut();
+    let mut real_ptr: *mut c_void = std::ptr::null_mut();
+    let mut node_size: u32;
+    let alloc_size: u32 = Os_Mem_Align!(size + Os_Mem_Node_Head_Size!(), Os_Mem_Align_Size!());
+
+    real_ptr = Os_Get_Real_Ptr(pool, ptr);
+    if real_ptr.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    node = (real_ptr as u32 - Os_Mem_Node_Head_Size!()) as *mut LosMemDynNode;
+    Os_Mem_Check_Used_Node(pool, node);
+
+    node_size = Os_Mem_Node_Get_Size!((*node).self_node.size_and_flag);
+    if node_size >= alloc_size {
+        Os_Mem_Re_Alloc_Smaller(pool, alloc_size, node, node_size);
+        return ptr;
+    }
+
+    next_node = Os_Mem_Next_Node!(node);
+    if !Os_Mem_Node_Get_Used_Flag!((*next_node).self_node.size_and_flag) &&
+        ((*next_node).self_node.size_and_flag + node_size) >= alloc_size {
+        Os_Mem_Merge_Node_For_Re_Alloc_Bigger(pool, alloc_size, node, node_size, next_node);
+        return ptr;
+    }
+
+    tmp_ptr = Os_Mem_Alloc_With_Check(pool, size);
+    if !tmp_ptr.is_null() {
+        let gap_size: u32 = (ptr as u32 - real_ptr as u32);
+        //TODO: EOK是啥
+        if Memcpy_S(tmp_ptr, size, ptr, (node_size - Os_Mem_Node_Head_Size!() - gap_size)) != EOK {
+            Os_Mem_Free(pool, tmp_ptr);
+            return std::ptr::null_mut();
+        }
+        Os_Mem_Free_Node(node, pool);
+    }
+    tmp_ptr
+}
