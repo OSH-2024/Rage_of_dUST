@@ -1,4 +1,5 @@
 const LOS_OK: u32 = 0;
+const LOS_NOK: u32 = 0;
 
 //处在条件编译内
 fn Os_Mem_Integrity_Multi_Check() {
@@ -252,4 +253,264 @@ fn Os_Mem_Merge_Node_For_ReAlloc_Bigger(pool: &mut LosMemPoolInfo, alloc_size: u
 
     #[cfg(feature = "loscfg_mem_leakcheck")]
     Os_Mem_Link_Register_Record(node);
+}
+
+
+/*
+ * Description : reAlloc a Bigger memory node after merge node and nextNode
+ * Input       : pool      --- Pointer to memory pool
+ *               allocSize --- the size of new node which will be alloced
+ *               node      --- the node which will be realloced
+ *               nodeSize  --- the size of old node
+ *               nextNode  --- pointer next node which will be merged
+ * Output      : node      --- pointer to the new node after realloc
+ */
+fn Os_Mem_Init(pool: *mut c_void, size: u32) -> u32 {
+    let pool_info = pool as *mut LosMemPoolInfo;
+    let mut new_node: *mut LosMemDynNode = std::ptr::null_mut();
+    let mut end_node: *mut LosMemDynNode = std::ptr::null_mut();
+    let mut list_node_head: *mut LOS_DL_LIST = std::ptr::null_mut();
+    let mut pool_size = size;
+
+    #[cfg(feature = "LOSCFG_KERNEL_LMS")]
+    {
+        if !g_lms_Mem_Init_Hook.is_null() {
+            pool_size = g_lms_Mem_Init_Hook(pool, size);
+            if pool_size == 0 {
+                pool_size = size;
+            }
+        }
+    }
+    unsafe {
+        (*pool_info).pool = pool;
+        (*pool_info).pool_size = pool_size;
+
+        Os_Dlnk_Init_Multi_Head(Os_Mem_Head_Addr(pool));
+        new_node = Os_Mem_First_Node(pool);
+        (*new_node).self_node.size_and_flag = (pool_size - ((new_node as u32) - (pool as u32)) - Os_Mem_Node_Head_Size!());
+        (*new_node).self_node.pre_node = Os_Mem_End_Node(pool, pool_size) as *mut LosMemDynNode;
+        list_node_head = Os_Mem_Head(pool, (*new_node).self_node.size_and_flag);
+        if list_node_head.is_null() {
+            return LOS_NOK;
+        }
+
+        Los_List_Tail_Insert(list_node_head, &mut (*new_node).self_node.free_node_info);
+        end_node = os_mem_end_node(pool, pool_size) as *mut LosMemDynNode;
+        /*std::ptr::write_bytes(end_node,std::mem::size_of::<end_node>(), 0, std::mem::size_of::<LosMemDynNode>());*/
+        Memset_S(nd_node,std::mem::size_of::<end_node>(), 0, std::mem::size_of::<LosMemDynNode>());
+        (*end_node).self_node.pre_node = new_node;
+        (*end_node).self_node.size_and_flag = Os_Mem_Node_Head_Size!() ;
+        Os_Mem_Node_Set_Used_Flag(&mut (*end_node).self_node.size_and_flag);
+        Os_Mem_Set_Magic_Num_And_Task_Id(end_node);
+
+        #[cfg(feature = "LOSCFG_MEM_TASK_STAT")]
+        {
+            let stat_size = std::mem::size_of_val(&(*pool_info).stat);
+            /*std::ptr::write_bytes(&mut (*pool_info).stat, 0, stat_size);*/
+            Memset_S(&mut (*pool_info).stat,stat_size, 0, stat_size);
+            (*pool_info).stat.mem_total_used = std::mem::size_of::<LosMemPoolInfo>() + os_multi_dlnk_head_size!() +
+                                               os_mem_node_get_size((*end_node).self_node.size_and_flag);
+            (*pool_info).stat.mem_total_peak = (*pool_info).stat.mem_total_used;
+        }
+
+        #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
+        {
+            Os_Mem_Node_Save(new_node);
+            Os_Mem_Node_Save(end_node);
+        }
+    }
+
+    LOS_OK
+}
+
+fn Los_Mem_Init(pool: *mut c_void, mut size: u32) -> u32 {
+    let mut int_save: u32;
+
+    if pool.is_null() || size < Os_Mem_Min_Pool_Size!() {
+        return LOS_NOK;
+    }
+
+    if !Is_Aligned!(size, Os_Mem_Align_Size) || !Is_Aligned!(pool as u32, Os_Mem_Align_Size) {
+        println!("pool [{:?}, {:?}) size 0x{:x} should be aligned with OS_MEM_ALIGN_SIZE\n",
+                 pool, unsafe { pool.offset(size as isize) }, size);
+        size = Os_Mem_Align!(size, Os_Mem_Align_Size) - Os_Mem_Align_Size;
+    }
+
+    Mem_Lock!(int_save);
+    if Os_Mem_Mul_Pool_Init(pool, size) != 0 {
+        Mem_Unlock!(int_save);
+        return LOS_NOK;
+    }
+
+    if Os_Mem_Init(pool, size) != LOS_OK {
+        Os_Mem_Mul_Pool_Deinit(pool);
+        Mem_Unlock!(int_save);
+        return LOS_NOK;
+    }
+
+    Os_Slab_Mem_Init(pool, size);
+    Mem_Unlock!(int_save);
+
+    Los_Trace!(MEM_INFO_REQ, pool);
+    LOS_OK
+}
+
+fn LOS_Mem_Alloc(pool: *mut c_void, size: u32) -> *mut c_void {
+    let mut ptr: *mut c_void = std::ptr::null_mut();
+    let mut int_save: u32;
+
+    if pool.is_null() || size == 0 {
+        return std::ptr::null_mut();
+    }
+
+    if !g_Malloc_Hook.is_null() {
+        unsafe { g_Malloc_Hook() };
+    }
+
+    Mem_Lock!(int_save);
+    loop {
+        if Os_Mem_Node_Get_Used_Flag!(size) || Os_Mem_Node_Get_Aligned_Flag!(size) {
+            break;
+        }
+
+        ptr = Os_Slab_Mem_Alloc(pool, size);
+        if ptr.is_null() {
+            ptr = Os_Mem_Alloc_With_Check(pool, size);
+        }
+        break;
+    }
+
+    Mem_Unlock!(int_save);
+
+    Los_Trace!(Mem_Alloc, pool, ptr as u32, size);
+    ptr
+}
+
+fn LOS_Mem_Alloc_Align(pool: *mut c_void, size: u32, boundary: u32) -> *mut c_void {
+    let mut use_size: u32;
+    let mut gap_size: u32;
+    let mut ptr: *mut c_void = std::ptr::null_mut();
+    let mut aligned_ptr: *mut c_void = std::ptr::null_mut();
+    let mut alloc_node: *mut Los_Mem_Dyn_Node = std::ptr::null_mut();
+    let mut int_save: u32;
+
+    if pool.is_null() || size == 0 || boundary == 0 || !Is_Pow_Two!(boundary) ||
+        !Is_Aligned!(boundary, std::mem::size_of::<*mut c_void>() as u32) {
+        return std::ptr::null_mut();
+    }
+
+    Mem_Lock!(int_save);
+    loop {
+        /*
+         * sizeof(gapSize) bytes stores offset between alignedPtr and ptr,
+         * the ptr has been OS_MEM_ALIGN_SIZE(4 or 8) aligned, so maximum
+         * offset between alignedPtr and ptr is boundary - OS_MEM_ALIGN_SIZE
+         */
+        if (boundary - std::mem::size_of::<u32>() as u32) > (u32::MAX - size) {
+            break;
+        }
+
+        use_size = (size + boundary) - std::mem::size_of::<u32>() as u32;
+        if Os_Mem_Node_Get_Used_Flag!(use_size) || Os_Mem_Node_Get_Aligned_Flag!(use_size) {
+            break;
+        }
+
+        ptr = Os_Mem_Alloc_With_Check(pool, use_size);
+
+        aligned_ptr = Os_Mem_Align!(ptr, boundary) as *mut c_void;
+        if ptr == aligned_ptr {
+            break;
+        }
+        /* store gapSize in address (ptr -4), it will be checked while free */
+        gap_size = (aligned_ptr as u32) - (ptr as u32);
+        alloc_node = (ptr as *mut Los_Mem_Dyn_Node).offset(-1);
+        Os_Mem_Node_Set_Aligned_Flag!((*alloc_node).self_node.size_and_flag);
+
+        #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
+        Os_Mem_Node_Save_With_Gap_Size(alloc_node, gap_size);
+
+        Os_Mem_Node_Set_Aligned_Flag!(gap_size);
+        *((aligned_ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32) = gap_size;
+
+        ptr = aligned_ptr;
+        break;
+    }
+
+    Mem_Unlock!(int_save);
+    //TODO:枚举类型尚不知是否定义
+    Los_Trace!(Mem_Alloc_Align, pool, ptr as u32, size, boundary);
+    ptr
+}
+
+fn Os_Do_Mem_Free(pool: *mut c_void, ptr: *mut c_void, node: &Los_Mem_Dyn_Node){
+    Os_Mem_Check_Used_Node(pool, node);
+    Os_Mem_Free_Node(node, pool);
+
+    #[cfg(feature = "LOSCFG_KERNEL_LMS")]{
+        if !g_lms_Free_Hook.is_null() {
+            g_lms_Free_Hook(ptr);
+        }
+    }
+} 
+
+fn Os_Mem_Free(pool: *mut c_void, ptr: *const c_void) -> u32 {
+    let mut ret: u32 = LOS_OK;
+    let mut gap_size: u32;
+    let mut node: *mut Los_Mem_Dyn_Node = std::ptr::null_mut();
+
+    loop {
+        gap_size = *((ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32);
+        if Os_Mem_Node_Get_Aligned_Flag!(gap_size) && Os_Mem_Node_Get_Used_Flag!(gap_size) {
+            eprintln!("[{}:{}]: gapSize:0x{:x} error", “Os_Mem_Free()”, line!(), gap_size);
+            return ret;
+        }
+
+        node = (ptr as u32 - Os_Mem_Node_Head_Size!()) as *mut Los_Mem_Dyn_Node;
+
+        if Os_Mem_Node_Get_Aligned_Flag!(gap_size) {
+            gap_size = Os_Mem_Node_Get_Aligned_Gapsize!(gap_size);
+            if (gap_size & (Os_Mem_Align_Size!() - 1)) != 0 || gap_size > (ptr as u32 - Os_Mem_Node_Head_Size!()) {
+                eprintln!("illegal gapSize: 0x{:x}", gap_size);
+                break;
+            }
+            node = (ptr as u32 - gap_size - Os_Mem_Node_Head_Size!()) as *mut Los_Mem_Dyn_Node;
+        }
+
+        #[cfg(not(feature = "LOSCFG_MEM_HEAD_BACKUP"))]
+        Os_Do_Mem_Free(pool, ptr, node);
+        break;
+    }
+
+    #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
+    {
+        ret = Os_Mem_Backup_Check_And_Restore(pool, ptr, node);
+        if ret == 0 {
+            Os_Do_Mem_Free(pool, ptr, node);
+        }
+    }
+
+    ret
+}
+
+fn Los_Mem_Free(pool: *mut c_void, ptr: *mut c_void) -> u32 {
+    let mut ret: u32;
+    let int_save: u32;
+
+    if pool.is_null() || ptr.is_null() || !Is_Aligned!(pool as u32, std::mem::size_of::<*mut c_void>()) || !Is_Aligned!(ptr as u32, std::mem::size_of::<*mut c_void>()) {
+        return LOS_NOK;
+    }
+
+    Mem_Lock!(int_save);
+
+    if Os_Slab_Mem_Free(pool, ptr) {
+        ret = LOS_OK;
+    } 
+    else {
+        ret = Os_Mem_Free(pool, ptr);
+    }
+
+    Mem_Unlock!(int_save);
+
+    Los_Trace!(MEM_FREE, pool, ptr as u32);
+    ret
 }
