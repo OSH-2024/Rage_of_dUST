@@ -41,7 +41,7 @@ union Myunion{
 struct Moreinfo{
     magic: Cell<u32>,
     taskid: Cell<u32>,
-    
+
     #[cfg(feature = "LOSCFG_MEM_MUL_MODULE")]
     moduleid: Option<Cell<u32>>
 }
@@ -80,30 +80,30 @@ pub const os_bitmap_mask: u32 = 0x1f;
 
 macro_rules! Os_Multi_Dlnk_Head_Size{
     () => {
-        mem::size_of::<LosMultipleDlinkHead>()
+        std::mem::size_of::<LosMultipleDlinkHead>() as u32
     };
 }
 macro_rules! Os_Dlnk_Head_Size{
     () => {
-        Os_Multi_Dlnk_Head_Size
+        Os_Multi_Dlnk_Head_Size!()
     };
 }
 
 macro_rules! Os_Mem_Align{
     ($p: expr, $alignsize: expr) => {
-        (($p + $alignsize - 1) & ~($alignsize - 1))
+        (($p + $alignsize - 1) & !($alignsize - 1))
     };
 }
 
 macro_rules! Os_Mem_Node_Head_Size{
     () => {
-        mem::size_of::<LosMemDynNode>()
+       std::mem::size_of::<LosMemDynNode>() as u32
     };
 }
 
 macro_rules! Os_Mem_Min_Pool_Size{
     () => {
-        (Os_Dlnk_Head_Size!() + 2*Os_Mem_Node_Head_Size!() +std::mem::size_of::<LosMemPoolInfo>())
+        (Os_Dlnk_Head_Size!() + 2*Os_Mem_Node_Head_Size!() + std::mem::size_of::<LosMemPoolInfo>() as u32)
     };
 }
 
@@ -121,7 +121,7 @@ macro_rules! Pool_Addr_Alignsize {
 
 macro_rules! Os_Mem_Node_Used_Flag {
     () => {
-        0x80000000
+        0x80000000 
     };
 }
 
@@ -139,7 +139,7 @@ macro_rules! Os_Mem_Node_Aligned_And_Used_Flag {
 
 macro_rules! Os_Mem_Node_Get_Aligned_Flag{
     ($sizeandflag: expr) => {
-       ($sizeandflag & Os_Mem_Node_Aligned_Flag!())
+       ($sizeandflag & Os_Mem_Node_Aligned_Flag!()) as bool
     };
 }
 
@@ -151,13 +151,13 @@ macro_rules! Os_Mem_Node_Set_Aligned_Flag{
 
 macro_rules! Os_Mem_Node_Get_Aligned_GapSize{
     ($sizeandflag: expr) => {
-       ($sizeandflag & (~Os_Mem_Node_Aligned_Flag!()))
+       ($sizeandflag & (!Os_Mem_Node_Aligned_Flag!()))
     };
 }
 
 macro_rules! Os_Mem_Node_Get_Used_Flag{
     ($sizeandflag: expr) => {
-       ($sizeandflag & Os_Mem_Node_Used_Flag!())
+       ($sizeandflag & Os_Mem_Node_Used_Flag!()) as bool
     };
 }
 
@@ -169,7 +169,7 @@ macro_rules! Os_Mem_Node_Set_Used_Flag{
 
 macro_rules! Os_Mem_Node_Get_Size{
     ($sizeandflag: expr) => {
-       ($sizeandflag & (~Os_Mem_Node_Aligned_And_Used_Flag!()))
+       ($sizeandflag & (!Os_Mem_Node_Aligned_And_Used_Flag!()))
     };
 }
 ////
@@ -181,7 +181,7 @@ macro_rules! Os_Mem_Head{
 
 macro_rules! Os_Mem_Head_Addr{
     ($pool: expr) => {
-       ((($pool as mut u32) + std::mem::size_of::<LosMemPoolInfo>()) as *mut std::ffi::c_void)
+       ((($pool as u32) + std::mem::size_of::<LosMemPoolInfo>() as u32) as *mut std::ffi::c_void)
     };
 }
 
@@ -199,7 +199,7 @@ macro_rules! Os_Mem_First_Node{
 
 macro_rules! Os_Mem_End_Node{
     ($pool:expr, $size:expr) =>{
-        (((($pool as *mut char) + size - Os_Mem_Node_Head_Size!()) as *mut std::ffi::c_void) as *mut LosMemDynNode)
+        (((($pool as *mut char) + $size - Os_Mem_Node_Head_Size!()) as *mut std::ffi::c_void) as *mut LosMemDynNode)
 
     };
 }
