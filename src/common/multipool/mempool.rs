@@ -1,4 +1,6 @@
 use std::ptr;
+use crate::LosMoudleId::LosModMem;
+
 include!("mempool_h.rs");
 include!("mem_lock_unlock_h.rs");
 
