@@ -53,13 +53,13 @@ fn Los_Spin_Unlock_Restore(lock: *mut SpinLockS, int_save: u32) ->() {
 #[macro_export]
 macro_rules! Mem_Lock {
     ($int_save: expr) =>{
-        Los_Spin_Lock_Save(addr_of_mut!(g_mem_spin), &mut ($int_save));
+        Los_Spin_Lock_Save(std::ptr::addr_of_mut!(g_mem_spin), &mut ($int_save));
     };
 }
 
 #[macro_export]
 macro_rules! Mem_Unlock {
     ($int_save: expr) =>{
-        Los_Spin_Unlock_Restore(addr_of_mut!(g_mem_spin), $int_save);
+        Los_Spin_Unlock_Restore(std::ptr::addr_of_mut!(g_mem_spin), $int_save);
     };
 }
