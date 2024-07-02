@@ -91,7 +91,7 @@ macro_rules! Os_Dlnk_Head_Size{
 
 macro_rules! Os_Mem_Align{
     ($p: expr, $alignsize: expr) => {
-        (($p + $alignsize - 1) & !($alignsize - 1))
+        (($p as usize + $alignsize - 1) & !($alignsize - 1))
     };
 }
 
@@ -139,7 +139,7 @@ macro_rules! Os_Mem_Node_Aligned_And_Used_Flag {
 
 macro_rules! Os_Mem_Node_Get_Aligned_Flag{
     ($sizeandflag: expr) => {
-       ($sizeandflag & Os_Mem_Node_Aligned_Flag!()) as bool
+       ($sizeandflag & Os_Mem_Node_Aligned_Flag!()) != 0
     };
 }
 
@@ -157,7 +157,7 @@ macro_rules! Os_Mem_Node_Get_Aligned_GapSize{
 
 macro_rules! Os_Mem_Node_Get_Used_Flag{
     ($sizeandflag: expr) => {
-       ($sizeandflag & Os_Mem_Node_Used_Flag!()) as bool
+       ($sizeandflag & Os_Mem_Node_Used_Flag!()) != 0
     };
 }
 
@@ -187,19 +187,19 @@ macro_rules! Os_Mem_Head_Addr{
 
 macro_rules! Os_Mem_Next_Node{
     ($node: expr) =>{
-        (((($node as *mut char) + Os_Mem_Node_Get_Size!((*($node)).self_node.size_and_flag.get())) as *mut std::ffi::c_void) as *mut LosMemDynNode)
+        (((($node as *mut char).offset(Os_Mem_Node_Get_Size!((*($node)).self_node.size_and_flag.get()) as isize)) as *mut std::ffi::c_void) as *mut LosMemDynNode)
     };
 }
 
 macro_rules! Os_Mem_First_Node{
     ($pool: expr) =>{
-        ((((Os_Mem_Head_Addr!($pool) as *mut char) + Os_Dlnk_Head_Size!()) as *mut std::ffi::c_void) as *mut LosMemDynNode)
+        ((((Os_Mem_Head_Addr!($pool) as *mut char).offset(Os_Dlnk_Head_Size!() as isize)) as *mut std::ffi::c_void) as *mut LosMemDynNode)
     };
 }
 
 macro_rules! Os_Mem_End_Node{
     ($pool:expr, $size:expr) =>{
-        (((($pool as *mut char) + $size - Os_Mem_Node_Head_Size!()) as *mut std::ffi::c_void) as *mut LosMemDynNode)
+        (((($pool as *mut char).offset(($size - Os_Mem_Node_Head_Size!()) as isize)) as *mut std::ffi::c_void) as *mut LosMemDynNode)
 
     };
 }
@@ -218,13 +218,13 @@ macro_rules! Os_Mem_Middle_Addr{
 
 macro_rules! Os_Mem_Set_Magic{
     ($value: expr) => {
-        ($value = ((&mut $value) as mut u32) ^ ((-1) as mut u32) )
+        ($value = ((&mut $value) as u32) ^ ((-1) as u32) )//////
     };
 }
 
 macro_rules! Os_Mem_Magic_Valid{
     ($value: expr) =>{
-        (($value as mut u32) ^ ((&mut $value) as mut u32) == ((-1) as mut u32))
+        (($value as u32) ^ ((&mut $value) as u32) == ((u32::MAX) as u32))//////
     };
 }
 
