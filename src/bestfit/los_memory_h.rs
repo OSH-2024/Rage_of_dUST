@@ -10,23 +10,23 @@ struct LosMemPoolStatus{
 
 }//LOS_MEM_POOL_STATUS
 
-pub const OS_INVALID: u32 = -1;
+pub const OS_INVALID: u32 = u32::MAX;
 
-enum LOS_MOUDLE_ID {
-    Los_Mod_SYS = 0x0,          /**< System ID. Its value is 0x0. */
-    Los_Mod_Mem = 0x1,          /**< Dynamic memory module ID. Its value is 0x1. */
-    Los_Mod_Tsk = 0x2,          /**< Task module ID. Its value is 0x2. */
-    Los_Mod_Swtmr = 0x3,        /**< Software timer module ID. Its value is 0x3. */
-    Los_Mod_Tick = 0x4,         /**< Tick module ID. Its value is 0x4. */
-    Los_Mod_Msg = 0x5,          /**< Message module ID. Its value is 0x5. */
-    Los_Mod_Que = 0x6,          /**< Queue module ID. Its value is 0x6. */
-    Los_Mod_Sem = 0x7,          /**< Semaphore module ID. Its value is 0x7. */
-    Los_Mod_Mbox = 0x8,         /**< Static memory module ID. Its value is 0x8. */
-    Los_Mod_Mmu = 0xd,          /**< MMU module ID. Its value is 0xd. */
-    Los_Mod_Log = 0xe,          /**< Log module ID. Its value is 0xe. */
-    Los_Mod_Err = 0xf,          /**< Error handling module ID. Its value is 0xf. */
-    Los_Mod_Exc = 0x10,         /**< Exception handling module ID. Its value is 0x10. */
-    Los_Mod_Butt                /**< It is end flag of this enumeration. */
+enum LosMoudleId {
+    LosModSys = 0x0,          /**< System ID. Its value is 0x0. */
+    LosModMem = 0x1,          /**< Dynamic memory module ID. Its value is 0x1. */
+    LosModTsk = 0x2,          /**< Task module ID. Its value is 0x2. */
+    LosModSwtmr = 0x3,        /**< Software timer module ID. Its value is 0x3. */
+    LosModTick = 0x4,         /**< Tick module ID. Its value is 0x4. */
+    LosModMsg = 0x5,          /**< Message module ID. Its value is 0x5. */
+    LosModQue = 0x6,          /**< Queue module ID. Its value is 0x6. */
+    LosModSem = 0x7,          /**< Semaphore module ID. Its value is 0x7. */
+    LosModMbox = 0x8,         /**< Static memory module ID. Its value is 0x8. */
+    LosModMmu = 0xd,          /**< MMU module ID. Its value is 0xd. */
+    LosModLog = 0xe,          /**< Log module ID. Its value is 0xe. */
+    LosModErr = 0xf,          /**< Error handling module ID. Its value is 0xf. */
+    LosModExc = 0x10,         /**< Exception handling module ID. Its value is 0x10. */
+    LosModButt                /* *< It is end flag of this enumeration. */
 }
 
 macro_rules! Los_Mem_Check_Level_High {
@@ -67,31 +67,31 @@ macro_rules! Los_Errno_Os_Error {
 
 macro_rules! Los_Errno_Memcheck_Wrong_Level {
     {} => {
-        Los_Errno_Os_Error!(Los_Mod_Mem, 0x4)
+        Los_Errno_Os_Error!(LosModMem, 0x4)
     };
 }
 
 macro_rules! Los_Errno_Memcheck_Disabled {
     {} => {
-        Los_Errno_Os_Error!(Los_Mod_Mem, 0x5)
+        Los_Errno_Os_Error!(LosModMem, 0x5)
     }
 }
 
 macro_rules! Los_Errno_Memcheck_Para_Null {
     {} => {
-        Los_Errno_Os_Error!(Los_Mod_Mem, 0x1)
+        Los_Errno_Os_Error!(LosModMem, 0x1)
     }
 }
 
 macro_rules! Los_Errno_Memcheck_Outside {
     {} => {
-        Los_Errno_Os_Error!(Los_Mod_Mem, 0x2)
+        Los_Errno_Os_Error!(LosModMem, 0x2)
     }
 }
 
 macro_rules! Los_Errno_Memcheck_No_Head {
     {} => {
-        Los_Errno_Os_Error!(Los_Mod_Mem, 0x3)
+        Los_Errno_Os_Error!(LosModMem, 0x3)
     }
 }
 
