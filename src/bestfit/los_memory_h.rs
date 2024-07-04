@@ -211,12 +211,6 @@ macro_rules! Los_Errno_Memcheck_No_Head {
     }
 }
 
-macro_rules! Os_Mem_Align_Size {
-    {} => {
-        std::mem::size_of::<u32>()
-    }
-}
-
 macro_rules! Mem_Module_Max {
     {} => {
         0x20

@@ -5,7 +5,7 @@ use std::cell::Cell;
 use std::mem;
 extern crate cortex_m;
 use std::arch::asm;
-
+use std::fmt::Write;
 
 struct SpinLockS{
     raw_lock: u32   
@@ -129,6 +129,12 @@ macro_rules! Pool_Addr_Alignsize {
     };
 }
 
+macro_rules! Os_Mem_Align_Size {
+    {} => {
+        std::mem::size_of::<u32>()
+    }
+}
+
 macro_rules! Os_Mem_Node_Used_Flag {
     () => {
         0x80000000 
@@ -159,7 +165,7 @@ macro_rules! Os_Mem_Node_Set_Aligned_Flag{
     };
 }
 
-macro_rules! Os_Mem_Node_Get_Aligned_GapSize{
+macro_rules! Os_Mem_Node_Get_Aligned_Gapsize{
     ($sizeandflag: expr) => {
        ($sizeandflag & (!Os_Mem_Node_Aligned_Flag!()))
     };
@@ -185,7 +191,7 @@ macro_rules! Os_Mem_Node_Get_Size{
 ////
 macro_rules! Os_Mem_Head{
     ($pool:expr, $size:expr) => {
-       Os_Dlnk_Multi_Head(Os_Mem_Head_Addr!($pool), size);
+       Os_Dlnk_Multi_Head(Os_Mem_Head_Addr!($pool), $size)
     };
 }
 
@@ -293,6 +299,11 @@ macro_rules! Mem_Unlock {
     };
 }
 
+macro_rules! Is_Aligned{
+    ($value:expr, $alignsize: expr)=> {
+        (($value as u32 & $alignsize as u32) == 0)
+    };
+}
 
 
 

@@ -41,3 +41,11 @@ fn Os_Dlnk_Multi_Head(headaddr: *mut std::ffi::c_void, size: u32) -> *mut LosDlL
     }
     &mut (*dlinkhead).list_head[(index - Os_Min_Multi_Dlnk_Log2!())as usize]
 }
+
+fn Os_Dlnk_Next_Multi_Head(head_addr: *mut std::ffi::c_void, list_node_head: *mut LosDlList) -> *mut LosDlList{
+    let head: *mut LosMultipleDlinkHead = head_addr as *mut LosMultipleDlinkHead;
+    if (&mut (*head).list_head[Os_Multi_Dlnk_Num!() -1] )as *mut LosDlList == list_node_head {
+        return std::ptr::null_mut();
+    }
+    list_node_head.offset(1) 
+}
