@@ -9,7 +9,7 @@ macro_rules! Arm_Sysreg_Read {
         let mut val: u32;
         unsafe {
             asm!("mrc $0, 0, $1, c15, c0, 0"
-                : "=r"(val)
+                : "=&r"(val)
                 : "r"($reg)
                 : "memory");
         }
@@ -98,7 +98,6 @@ static mut m_auc_sys_mem1: *mut u8 = 0 as *mut u8;
 type MallocHook = fn();
 static mut g_malloc_hook: Option<MallocHook> = None;
 
-use std::arch::asm; //?
 #[link_section = ".data.init"]
 static mut g_sys_mem_addr_end: usize = 0;
 
@@ -301,10 +300,10 @@ fn Os_Mem_Checksum_Verify(ctl_node: *mut LosMemCtlNode) -> bool {
 unsafe fn Os_Mem_Backup_Setup(node: *mut LosMemDynNode) {
     let node_pre: *mut LosMemDynNode = (*node).self_node.prenode;
     if !node_pre.is_null() {
-        (*node_pre).backup_node.myunion.free_node_info.pst_next =
-            (*node).self_node.myunion.free_node_info.pst_next;
-        (*node_pre).backup_node.myunion.free_node_info.pst_prev =
-            (*node).self_node.myunion.free_node_info.pst_prev;
+        std::ptr::write((*node_pre).backup_node.myunion.free_node_info.pst_next, 
+            *((*node).self_node.myunion.free_node_info.pst_next));
+        std::ptr::write((*node_pre).backup_node.myunion.free_node_info.pst_prev, 
+            *((*node).self_node.myunion.free_node_info.pst_prev));
         (*node_pre).backup_node.prenode = (*node).self_node.prenode;
         (*node_pre).backup_node.checksum = (*node).self_node.checksum;
         (*node_pre).backup_node.gapsize = (*node).self_node.gapsize;
@@ -342,10 +341,10 @@ fn Os_Mem_Backup_Setup_4_Next(pool: *mut std::ffi::c_void, node: *mut LosMemDynN
     }
 
     if !Os_Mem_Checksum_Verify(&mut (*node).backup_node as *mut LosMemCtlNode) {
-        (*node).backup_node.myunion.free_node_info.pst_next =
-            (*node_next).self_node.myunion.free_node_info.pst_next;
-        (*node).backup_node.myunion.free_node_info.pst_prev =
-            (*node_next).self_node.myunion.free_node_info.pst_prev;
+        std::ptr::write((*node).backup_node.myunion.free_node_info.pst_next, 
+            *((*node_next).self_node.myunion.free_node_info.pst_next));
+            std::ptr::write((*node).backup_node.myunion.free_node_info.pst_prev, 
+            *((*node_next).self_node.myunion.free_node_info.pst_prev));
         (*node).backup_node.prenode = (*node_next).self_node.prenode;
         (*node).backup_node.checksum = (*node_next).self_node.checksum;
         (*node).backup_node.gapsize = (*node_next).self_node.gapsize;
@@ -372,10 +371,10 @@ fn Os_Mem_Backup_Do_Restore(
     println!("the detailed information of previous node:");
     Os_Mem_Disp_More_Details(node_pre);
 
-    (*node).self_node.myunion.free_node_info.pst_next =
-        (*node_pre).backup_node.myunion.free_node_info.pst_next;
-    (*node).self_node.myunion.free_node_info.pst_prev =
-        (*node_pre).backup_node.myunion.free_node_info.pst_prev;
+    std::ptr::write((*node).self_node.myunion.free_node_info.pst_next, 
+        *((*node_pre).backup_node.myunion.free_node_info.pst_next));
+    std::ptr::write((*node).self_node.myunion.free_node_info.pst_prev, 
+        *((*node_pre).backup_node.myunion.free_node_info.pst_prev));
     (*node).self_node.prenode = (*node_pre).backup_node.prenode;
     (*node).self_node.checksum = (*node_pre).backup_node.checksum;
     (*node).self_node.gapsize = (*node_pre).backup_node.gapsize;
@@ -611,19 +610,19 @@ unsafe fn Os_Mem_List_Delete(node: *mut LosDlList, first_node: *mut std::ffi::c_
 
     if (*node).pst_next as *mut std::ffi::c_void >= first_node {
         //dyn_node = Los_Dl_List_Entry!((*node).pst_next, LosMemDynNode, self_node.free_node_info);
-        dyn_node = ((((*node).pst_next) as *mut char).offset((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as isize * (-1))) as *mut std::ffi::c_void as *mut LosMemDynNode;
+        //dyn_node = ((((*node).pst_next) as *mut char).offset((((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info)).as_mut_ptr() as *mut LosDlList) as isize) * (-1))) as *mut std::ffi::c_void as *mut LosMemDynNode;
         Os_Mem_Node_Save(dyn_node);
     }
     if (*node).pst_prev as *mut std::ffi::c_void >= first_node {
         //dyn_node = Los_Dl_List_Entry!((*node).pst_prev, LosMemDynNode, self_node.free_node_info);
-        dyn_node = ((((*node).pst_next) as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
+        //dyn_node = ((((*node).pst_next) as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
         Os_Mem_Node_Save(dyn_node);
     }
 
     (*node).pst_next = std::ptr::null_mut();
     (*node).pst_prev = std::ptr::null_mut();
 
-    dyn_node = ((node as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
+    //dyn_node = ((node as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
     Os_Mem_Node_Save(dyn_node);
 }
 
@@ -640,12 +639,12 @@ unsafe fn Os_MEM_List_Add(
     (*node).pst_prev = list_node;
 
     //dyn_node = Los_Dl_List_Entry!(node, LosMemDynNode, self_node.free_node_info);
-    dyn_node = ((node as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
+    //dyn_node = ((node as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
     Os_Mem_Node_Save(dyn_node);
 
     (*(*list_node).pst_next).pst_prev = node;
     if (*list_node).pst_next as *mut std::ffi::c_void >= first_node {
-        dyn_node = ((((*list_node).pst_next) as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
+        //dyn_node = ((((*list_node).pst_next) as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
         Os_Mem_Node_Save(dyn_node);
     }
 
@@ -1379,7 +1378,7 @@ fn Los_Mem_M_Free(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void, modul
         moduleid = Os_Mem_Modid_Get(node);
     }
 
-    ret = LOS_MemFree(pool, ptr);
+    ret = LOS_Mem_Free(pool, ptr);
     if ret == LOS_OK {
         Mem_Lock!(int_save);
         g_module_mem_used_size[moduleid as usize] =
