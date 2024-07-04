@@ -41,13 +41,8 @@ enum LosMoudleId {
     LosModButt, /* *< It is end flag of this enumeration. */
 }
 
-type TSK_ENTRY_FUNC = fn(*mut std::ffi::c_void) -> *mut std::ffi::c_void;
-
-struct LOS_DL_LIST {
-    pstPrev: *mut LOS_DL_LIST,
-    pstNext: *mut LOS_DL_LIST,
-}
-
+//type TSK_ENTRY_FUNC = fn(*mut std::ffi::c_void) -> *mut std::ffi::c_void;
+/*
 struct SortLinkList {
     sort_link_node: LOS_DL_LIST,
     idx_roll_num: u32,
@@ -84,7 +79,8 @@ struct SchedStat {
     all_runtime: u64,
     all_context_switch: u32,
     sched_percpu: SchePercpu, //假定LOSCFG_KERNEL_CORE_NUM=1
-}
+}*/
+
 struct LosTaskCB {
     stack_pointer: *mut std::ffi::c_void,
     task_status: u16,
@@ -94,10 +90,10 @@ struct LosTaskCB {
     stack_size: u32,
     top_of_stack: u32,
     task_id: u32,
-    task_entry: TSK_ENTRY_FUNC,
+    //task_entry: TSK_ENTRY_FUNC,
     task_sem: *mut std::ffi::c_void,
-
-    // [#(cfg(feature = "LOSCFG_COMPAT_POSIX"))]
+    task_name: *mut char,
+    /*// [#(cfg(feature = "LOSCFG_COMPAT_POSIX"))]
     thread_join: *mut std::ffi::c_void,
     // [#(cfg(feature = "LOSCFG_COMPAT_POSIX"))]
     thread_join_retval: *mut std::ffi::c_void,
@@ -108,12 +104,10 @@ struct LosTaskCB {
     // args:[u32;4],
     // [#(cfg(not(feature = "LOSCFG_OBSOLETE_API")))]
     args: *mut std::ffi::c_void,
-
-    task_name: *mut char,
     pend_list: LOS_DL_LIST,
-    sort_list: SortLinkList,
+    sort_list: SortLinkList,*/
 
-    // [#(cfg(feature = "LOSCFG_BASE_IPC_EVENT"))]
+    /*// [#(cfg(feature = "LOSCFG_BASE_IPC_EVENT"))]
     event: EVENT_CB_S,
     // [#(cfg(feature = "LOSCFG_BASE_IPC_EVENT"))]
     event_mask: u32,
@@ -122,9 +116,9 @@ struct LosTaskCB {
 
     msg: *mut std::ffi::c_void,
     pri_bit_map: u32,
-    signal: u32,
+    signal: u32,*/
 
-    // [#(cfg(feature = "LOSCFG_BASE_CORE_TIMESLICE"))]
+    /*// [#(cfg(feature = "LOSCFG_BASE_CORE_TIMESLICE"))]
     time_slice: u16,
 
     // [#(cfg(feature = "LOSCFG_KERNEL_SMP"))]
@@ -148,7 +142,7 @@ struct LosTaskCB {
     // [#(cfg(feature = "LOSCFG_KERNEL_PERF"))]
     pc: u32,
     // [#(cfg(feature = "LOSCFG_KERNEL_PERF"))]
-    fp: u32,
+    fp: u32,*/
 }
 
 macro_rules! Los_Mem_Check_Level_High {
@@ -248,3 +242,16 @@ macro_rules! Column_Num {
         8
     };
 }
+
+macro_rules! Los_Off_Set_Of {
+    ($typ: ty, $member: expr) => {
+        (&mut (*(0 as *mut $typ).$member) ) as u32
+    };
+}
+
+macro_rules! Los_Dl_List_Entry {
+    ($item: expr, $typ: ty, $member: expr) => {
+        (($item as *mut char).offset(-Los_Off_Set_Of!($typ, $member) as isize)) as *mut std::ffi::c_void as *mut $typ
+    };
+}
+
