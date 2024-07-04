@@ -242,16 +242,16 @@ macro_rules! Column_Num {
         8
     };
 }
-
+/*
 macro_rules! Los_Off_Set_Of {
-    ($typ: ty, $member: expr) => {
-        (&mut (*(0 as *mut $typ).$member) ) as u32
+    ($typ: ty, $member: pat) => {
+        (&mut ((*(0 as *mut $typ)).$member) ) as u32
     };
 }
 
 macro_rules! Los_Dl_List_Entry {
-    ($item: expr, $typ: ty, $member: expr) => {
+    ($item: expr, $typ: ty, $member: pat) => {
         (($item as *mut char).offset(-Los_Off_Set_Of!($typ, $member) as isize)) as *mut std::ffi::c_void as *mut $typ
     };
-}
+}*/
 

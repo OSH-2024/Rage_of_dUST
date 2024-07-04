@@ -4,7 +4,7 @@ use std::cell::Cell;
 //使用 Cell 可变性容器,通过 .get 方法获取值，.set 方法来修改值
 use std::mem;
 extern crate cortex_m;
-use cortex_m::asm;
+use std::arch::asm;
 
 
 struct SpinLockS{
@@ -244,11 +244,11 @@ fn Arch_Int_Lock()->u32{
     let temp: u32;
     unsafe {
         asm!(
-            "mrs    $0, cpsr",
-            "orr    $1, $0, #0xc0",
-            "msr    cpsr_c, $1",
-            lateout("r") int_save,
-            lateout("r") temp,
+            "mrs $0, cpsr",        // 读取当前程序状态寄存器到 $0
+            "orr $1, $0, #0xc0",  // 将 $0 和 0xc0 进行或操作，并存储到 $1
+            "msr cpsr_c, $1",      // 将 $1 写回到 cpsr_c 寄存器
+            "=&r"(int_save) "=&r"(temp), // 输出约束，指定使用通用寄存器
+            "memory"             // 告诉编译器内联汇编代码可能会修改内存
         );
     }
     int_save
