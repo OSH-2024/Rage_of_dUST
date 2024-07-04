@@ -140,15 +140,17 @@ fn Os_Mem_Modid_Get(node: *mut LosMemDynNode) -> u32 {
 fn Os_Mem_Set_Magic_Num_And_Task_Id(node: *mut LosMemDynNode) {
     //#[cfg(any(feature = "LOSCFG_MEM_DEBUG", feature = "LOSCFG_MEM_TASK_STAT"))]
     {
-        run_task: *mut LosTaskCB = Os_Curr_Task_Get();
+        let run_task: *mut LosTaskCB = Os_Curr_Task_Get();
 
-        Os_Mem_Set_Magic!((*node).self_node.myunion.extend_field.magic.get());
+        let mut value: u32 = (*node).self_node.myunion.extend_field.magic.get();
+        Os_Mem_Set_Magic!(value);
+        (*node).self_node.myunion.extend_field.magic.set(value);
 
         if !run_task.is_null() && Os_Int_Inactive!() {
             Os_Mem_Taskid_Set(node, (*run_task).task_id);
         } 
         else{
-            Os_Mem_Taskid_set(node, 12);
+            Os_Mem_Taskid_Set(node, 12);
         }
         
     }
@@ -254,7 +256,7 @@ unsafe fn Os_Mem_Disp_Wild_Pointer_Msg(node: *mut LosMemDynNode, ptr: *mut std::
     );
     println!(
         "the pointer should be: {:p}",
-        node.offset((*node).self_node.gapsize.get() + std::mem::size_of::<LosMemDynNode>() as u32)
+        node.offset(((*node).self_node.gapsize.get() + std::mem::size_of::<LosMemDynNode>() as u32) as isize)
     );
     println!("the pointer given is: {:p}", ptr);
     println!("PROBABLY A WILD POINTER");
@@ -319,7 +321,7 @@ fn Os_Mem_Backup_Setup_4_Next(pool: *mut std::ffi::c_void, node: *mut LosMemDynN
         return 1; //LOS_NOK
     }
 
-    if !Os_Mem_Checksum_Verify(&mut (*node).backup_node as *mut LosMemCtlNode) { {
+    if !Os_Mem_Checksum_Verify(&mut (*node).backup_node as *mut LosMemCtlNode) { 
         (*node).backup_node.myunion.free_node_info.pst_next =
             (*node_next).self_node.free_node_info.pst_next;
         (*node).backup_node.myunion.free_node_info.pst_prev =
