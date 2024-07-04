@@ -1,11 +1,14 @@
 include!("los_memory_h.rs");
 
 //regs.h 50 GPT生成，存疑
+
+static mut g_int_count: [u32; 1] = [0;1];
+static mut g_task_cb_array: *mut LosTaskCB = 0 as *mut LosTaskCB;
 macro_rules! Arm_Sysreg_Read {
     ($reg:expr) => {{
         let mut val: u32;
         unsafe {
-            llvm_asm!("mrc $0, 0, $1, c15, c0, 0"
+            asm!("mrc $0, 0, $1, c15, c0, 0"
                 : "=r"(val)
                 : "r"($reg)
                 : "memory");
@@ -33,6 +36,13 @@ fn Arch_Curr_Task_Get() -> *mut std::ffi::c_void {
 fn Os_Curr_Task_Get() -> *mut LosTaskCB {
     Arch_Curr_Task_Get() as *mut LosTaskCB
 }
+
+macro_rules! Os_Tcb_From_Tid{
+    ($task_id:expr)=>{
+        (g_task_cb_array as *mut LosTaskCB).offset($task_id as isize)
+    };
+}
+/*
 //los_exc.c中定义，在los_memory.c 233行调用
 fn Los_Back_Trace() {
     //[#cfg(feature="LOSCFG_BACKTRACE")]
@@ -43,13 +53,16 @@ macro_rules! Os_Back_Trace {
     () => {
         Los_Back_Trace()
     };
-}
+}*/
 
 //los_hwi.c 353
 fn Int_Active() -> u32 {
-    let int_count: u32;
-    let int_save: u32 = Los_Int_Lock();
+    let mut int_count: u32;
+    let mut int_save: u32 = Los_Int_Lock();
+    int_count = g_int_count[0];
+    Los_Int_Restore(int_save);
 
+    int_count
     //TODO
 }
 
@@ -63,7 +76,7 @@ macro_rules! Os_Int_Active {
 //los_hwi.h 74
 macro_rules! Os_Int_Inactive {
     () => {
-        !Os_Int_Active!()
+        !Os_Int_Active!() != 0
     };
 }
 // use std::panic::Location; //用于获取行数
@@ -227,9 +240,8 @@ unsafe fn Os_Mem_Disp_More_Details(node: *mut LosMemDynNode) {
     }
 
     let task_cb: *mut LosTaskCB = Os_Tcb_From_Tid!(task_id);
-    if (task_cb.tsk_status & 0x0001u16)
-        || (task_cb.task_entry == None)
-        || (task_cb.task_name == None)
+    if (((*task_cb).task_status & 0x0001u16) != 0)
+        || ((*task_cb).task_name == std::ptr::null_mut())
     //OS_TASK_STATUS_UNUSED=0x0001U，taskStatus为UINT16类型
     {
         println!("The task [ID:0x{:x}] is NOT CREATED(ILLEGAL)", task_id);
@@ -238,8 +250,8 @@ unsafe fn Os_Mem_Disp_More_Details(node: *mut LosMemDynNode) {
     }
 
     println!(
-        "allocated by task: {} [ID = 0x{:x}]\n",
-        task_cb.task_name, task_id
+        "allocated by task: {:?} [ID = 0x{:x}]\n",
+        (*task_cb).task_name, task_id
     );
     //ifdef LOSCFG_MEM_MUL_MODULE
     println!("allocted by moduleId:{}", Os_Mem_Modid_Get(node));
@@ -266,7 +278,7 @@ unsafe fn Os_Mem_Disp_Wild_Pointer_Msg(node: *mut LosMemDynNode, ptr: *mut std::
     );
     println!("the pointer given is: {:p}", ptr);
     println!("PROBABLY A WILD POINTER");
-    Os_Back_Trace!(); //TODO
+    //Os_Back_Trace!(); //TODO
     println!("************************************************");
 }
 
@@ -331,9 +343,9 @@ fn Os_Mem_Backup_Setup_4_Next(pool: *mut std::ffi::c_void, node: *mut LosMemDynN
 
     if !Os_Mem_Checksum_Verify(&mut (*node).backup_node as *mut LosMemCtlNode) {
         (*node).backup_node.myunion.free_node_info.pst_next =
-            (*node_next).self_node.free_node_info.pst_next;
+            (*node_next).self_node.myunion.free_node_info.pst_next;
         (*node).backup_node.myunion.free_node_info.pst_prev =
-            (*node_next).self_node.free_node_info.pst_prev;
+            (*node_next).self_node.myunion.free_node_info.pst_prev;
         (*node).backup_node.prenode = (*node_next).self_node.prenode;
         (*node).backup_node.checksum = (*node_next).self_node.checksum;
         (*node).backup_node.gapsize = (*node_next).self_node.gapsize;
@@ -356,7 +368,7 @@ fn Os_Mem_Backup_Do_Restore(
     }
 
     println!("the backup node information of current node in previous node:");
-    Os_Mem_Disp_Ctl_Node((*node_pre).backup_node);
+    Os_Mem_Disp_Ctl_Node(&mut (*node_pre).backup_node as *mut LosMemCtlNode);
     println!("the detailed information of previous node:");
     Os_Mem_Disp_More_Details(node_pre);
 
@@ -376,7 +388,7 @@ fn Os_Mem_Backup_Do_Restore(
 //317
 //#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_First_Node_PrevGet(pool_info: *mut LosMemPoolInfo) -> *mut LosMemDynNode {
-    let node_pre: *mut LosMemDynNode = Os_Mem_End_Node!(pool_info, pool_info.pool_size);
+    let node_pre: *mut LosMemDynNode = Os_Mem_End_Node!(pool_info, (*pool_info).pool_size);
 
     if !Os_Mem_Checksum_Verify(&mut (*node_pre).self_node as *mut LosMemCtlNode) {
         println!("the current node is THE FIRST NODE !");
@@ -399,7 +411,7 @@ unsafe fn Os_Mem_Node_Prev_Get(
     node: *mut LosMemDynNode,
 ) -> *mut LosMemDynNode {
     let node_cur: *mut LosMemDynNode = Os_Mem_First_Node!(pool);
-    // let node_pre:*mut LosMemDynNode=Os_Mem_First_Node_PrevGet(pool);
+    let node_pre:*mut LosMemDynNode=Os_Mem_First_Node_PrevGet(pool as *mut LosMemPoolInfo);
     let pool_info: *mut LosMemPoolInfo = pool as *mut LosMemPoolInfo;
 
     if node == Os_Mem_First_Node!(pool) {
@@ -598,18 +610,20 @@ unsafe fn Os_Mem_List_Delete(node: *mut LosDlList, first_node: *mut std::ffi::c_
     (*(*node).pst_prev).pst_next = (*node).pst_next;
 
     if (*node).pst_next as *mut std::ffi::c_void >= first_node {
-        dyn_node = Los_Dl_List_Entry!((*node).pst_next, LosMemDynNode, self_node.free_node_info);
+        //dyn_node = Los_Dl_List_Entry!((*node).pst_next, LosMemDynNode, self_node.free_node_info);
+        dyn_node = ((((*node).pst_next) as *mut char).offset((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as isize * (-1))) as *mut std::ffi::c_void as *mut LosMemDynNode;
         Os_Mem_Node_Save(dyn_node);
     }
     if (*node).pst_prev as *mut std::ffi::c_void >= first_node {
-        dyn_node = Los_Dl_List_Entry!((*node).pst_prev, LosMemDynNode, self_node.free_node_info);
+        //dyn_node = Los_Dl_List_Entry!((*node).pst_prev, LosMemDynNode, self_node.free_node_info);
+        dyn_node = ((((*node).pst_next) as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
         Os_Mem_Node_Save(dyn_node);
     }
 
     (*node).pst_next = std::ptr::null_mut();
     (*node).pst_prev = std::ptr::null_mut();
 
-    dyn_node = Los_Dl_List_Entry!(node, LosMemDynNode, self_node.free_node_info);
+    dyn_node = ((node as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
     Os_Mem_Node_Save(dyn_node);
 }
 
@@ -625,16 +639,13 @@ unsafe fn Os_MEM_List_Add(
     (*node).pst_next = (*list_node).pst_next;
     (*node).pst_prev = list_node;
 
-    dyn_node = Los_Dl_List_Entry!(node, LosMemDynNode, self_node.free_node_info);
+    //dyn_node = Los_Dl_List_Entry!(node, LosMemDynNode, self_node.free_node_info);
+    dyn_node = ((node as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
     Os_Mem_Node_Save(dyn_node);
 
     (*(*list_node).pst_next).pst_prev = node;
     if (*list_node).pst_next as *mut std::ffi::c_void >= first_node {
-        dyn_node = Los_Dl_List_Entry!(
-            (*list_node).pst_next,
-            LosMemDynNode,
-            self_node.free_node_info
-        );
+        dyn_node = ((((*list_node).pst_next) as *mut char).offset(-((&mut ((*(0 as *mut LosMemDynNode)).self_node.myunion.free_node_info) ) as u32) as isize)) as *mut std::ffi::c_void as *mut LosMemDynNode;
         Os_Mem_Node_Save(dyn_node);
     }
 
