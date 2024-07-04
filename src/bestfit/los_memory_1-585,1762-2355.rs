@@ -45,16 +45,6 @@ macro_rules! Os_Back_Trace {
     };
 }
 
-//interrupt.h 72
-fn Arch_Int_Lock() -> u32 {
-    //TODO
-}
-
-//los_hwi.h 343
-fn Los_Int_Lock()->u32{
-    Arch_Int_Lock()
-}
-
 //los_hwi.c 353
 fn Int_Active()->u32{
     let int_count:u32;
@@ -108,11 +98,6 @@ static mut g_mem_check_level: u8 = 0xff; //LOS_MEM_CHECK_LEVEL_DEFAULT
 
 //#[cfg(feature = "LOSCFG_MEM_MUL_MODULE")] //MEM_MODULE_MAX=0x20
 static mut g_module_mem_used_size: [u32; 0x20 + 1] = [0; 0x20 + 1];
-
-//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
-fn Os_Mem_Node_Save(node: *mut LosMemDynNode) {
-    // TODO:
-}
 
 //94
 fn Os_Mem_Taskid_Set(node: *mut LosMemDynNode, task_id: u32) {
@@ -175,6 +160,7 @@ fn Os_Mem_Set_Magic_Num_And_Task_Id(node: *mut LosMemDynNode) {
 //#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 const CHECKSUM_MAGICNUM: u32 = 0xDEADBEEF;
 
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 macro_rules! Os_Mem_Node_Checksum_Calculate {
     ($ctl_node:expr) => {
         let ctl_node = $ctl_node; //TODO:
@@ -188,6 +174,7 @@ macro_rules! Os_Mem_Node_Checksum_Calculate {
 }
 
 //164行
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_Disp_Ctl_Node(ctl_node: *mut LosMemCtlNode) {
     let mut checksum: u32;
 
@@ -206,6 +193,7 @@ fn Os_Mem_Disp_Ctl_Node(ctl_node: *mut LosMemCtlNode) {
 }
 
 //182行
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Disp_More_Details(node: *mut LosMemDynNode) {
     let task_id: u32;
     //
@@ -255,6 +243,7 @@ unsafe fn Os_Mem_Disp_More_Details(node: *mut LosMemDynNode) {
 }
 
 //224行
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Disp_Wild_Pointer_Msg(node: *mut LosMemDynNode, ptr: *mut std::ffi::c_void) {
     println!("************************************************");
     println!(
@@ -274,16 +263,19 @@ unsafe fn Os_Mem_Disp_Wild_Pointer_Msg(node: *mut LosMemDynNode, ptr: *mut std::
 }
 
 //237行
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_Checksum_Set(ctl_node: *mut LosMemCtlNode) {
     (*ctl_node).checksum = Os_Mem_Node_Checksum_Calculate!(ctl_node);
 }
 
 //242行
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_Checksum_Verify(ctl_node: *mut LosMemCtlNode) -> bool {
     (*ctl_node).checksum == Os_Mem_Node_Checksum_Calculate!(ctl_node)
 }
 
 //247行
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Backup_Setup(node: *mut LosMemDynNode) {
     let node_pre: *mut LosMemDynNode = (*node).self_node.prenode;
     if !node_pre.is_null() {
@@ -299,6 +291,7 @@ unsafe fn Os_Mem_Backup_Setup(node: *mut LosMemDynNode) {
 }
 
 //260
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Node_Next_Get(
     pool: *mut std::ffi::c_void,
     node: *mut LosMemDynNode,
@@ -313,6 +306,7 @@ unsafe fn Os_Mem_Node_Next_Get(
 }
 
 //271
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_Backup_Setup_4_Next(pool: *mut std::ffi::c_void, node: *mut LosMemDynNode) -> u32 {
     let node_next: *mut LosMemDynNode = Os_Mem_Node_Next_Get(pool, node);
 
@@ -339,6 +333,7 @@ fn Os_Mem_Backup_Setup_4_Next(pool: *mut std::ffi::c_void, node: *mut LosMemDynN
 }
 
 //295
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_Backup_Do_Restore(
     pool: *mut std::ffi::c_void,
     node_pre: *mut LosMemDynNode,
@@ -369,6 +364,7 @@ fn Os_Mem_Backup_Do_Restore(
 }
 
 //317
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_First_Node_PrevGet(pool_info: *mut LosMemPoolInfo) -> *mut LosMemDynNode {
     let node_pre: *mut LosMemDynNode = Os_Mem_End_Node!(pool_info, pool_info.pool_size);
 
@@ -387,6 +383,7 @@ fn Os_Mem_First_Node_PrevGet(pool_info: *mut LosMemPoolInfo) -> *mut LosMemDynNo
 }
 
 //337
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Node_Prev_Get(
     pool: *mut std::ffi::c_void,
     node: *mut LosMemDynNode,
@@ -445,6 +442,7 @@ unsafe fn Os_Mem_Node_Prev_Get(
 }
 
 //395
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Node_Prev_Try_Get(
     pool: *mut std::ffi::c_void,
     node: *mut *mut LosMemDynNode,
@@ -508,6 +506,7 @@ unsafe fn Os_Mem_Node_Prev_Try_Get(
 }
 
 //449
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Backup_Try_Restore(
     pool: *mut std::ffi::c_void,
     node: *mut *mut LosMemDynNode,
@@ -526,6 +525,7 @@ unsafe fn Os_Mem_Backup_Try_Restore(
 }
 
 //461
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Backup_Restore(pool: *mut std::ffi::c_void, node: *mut LosMemDynNode) -> u32 {
     let node_pre: *mut LosMemDynNode = Os_Mem_Node_Prev_Get(pool, node);
 
@@ -537,6 +537,7 @@ unsafe fn Os_Mem_Backup_Restore(pool: *mut std::ffi::c_void, node: *mut LosMemDy
 }
 
 //471
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Backup_Check_And_Restore(
     pool: *mut std::ffi::c_void,
     node: *mut LosMemDynNode,
@@ -557,11 +558,13 @@ unsafe fn Os_Mem_Backup_Check_And_Restore(
 }
 
 //487
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Set_Gap_Size(ctl_node: *mut LosMemCtlNode, gap_size: u32) {
     (*ctl_node).gapsize.set(gap_size);
 }
 
 //492
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Node_Save(node: *mut LosMemDynNode) {
     Os_Mem_Set_Gap_Size(&mut (*node).self_node as *mut LosMemCtlNode, 0);
     Os_Mem_Checksum_Set(&mut (*node).self_node as *mut LosMemCtlNode);
@@ -569,6 +572,7 @@ unsafe fn Os_Mem_Node_Save(node: *mut LosMemDynNode) {
 }
 
 //499
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_Node_Save_With_Gap_Size(node: *mut LosMemDynNode, gap_size: u32) {
     Os_Mem_Set_Gap_Size(&mut (*node).self_node as *mut LosMemCtlNode, gap_size);
     Os_Mem_Checksum_Set(&mut (*node).self_node as *mut LosMemCtlNode);
@@ -576,6 +580,7 @@ unsafe fn Os_Mem_Node_Save_With_Gap_Size(node: *mut LosMemDynNode, gap_size: u32
 }
 
 //506
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_Mem_List_Delete(node: *mut LosDlList, first_node: *mut std::ffi::c_void) {
     let dyn_node: *mut LosMemDynNode = std::ptr::null_mut();
 
@@ -599,6 +604,7 @@ unsafe fn Os_Mem_List_Delete(node: *mut LosDlList, first_node: *mut std::ffi::c_
 }
 
 //530
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Os_MEM_List_Add(
     list_node: *mut LosDlList,
     node: *mut LosDlList,
@@ -626,6 +632,7 @@ unsafe fn Os_MEM_List_Add(
 }
 
 //549
+//#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 unsafe fn Los_Mem_Bad_Node_Show(pool: *mut std::ffi::c_void) {
     let node_pre: *mut LosMemDynNode = std::ptr::null_mut();
     let tmp_node: *mut LosMemDynNode = std::ptr::null_mut();
