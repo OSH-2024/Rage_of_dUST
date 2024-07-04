@@ -1,9 +1,29 @@
+//忽略不标准的蛇形命名法
+#![allow(non_snake_case)]
+use crate::los_memory_internal_h::*;
+use crate::los_memory_h::*;
+use crate::mempool_h::*;
+use crate::los_multipledlinkhead::*;
+
 const LOS_OK: u32 = 0;
 const LOS_NOK: u32 = 0;
 
+//Used only in this file
+
+#[inline(always)]
+fn os_slab_mem_free(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void) -> bool {
+    false
+}
+#[inline(always)]
+fn Os_Mem_Mul_Pool_Deinit(pool: *const std::ffi::c_void) -> u32 {
+    LOS_OK
+}
+fn Os_Mem_Mul_Pool_Init(pool: *const std::ffi::c_void, size: u32) -> u32 {
+    LOS_OK
+}
 //处在条件编译内
 fn Os_Mem_Integrity_Multi_Check() {
-    if Los_Mem_Integrity_Check(M_AUC_SYS_MEM1).is_ok() {
+    if Los_Mem_Integrity_Check(M_AUC_SYS_MEM1) == LOS_OK {
         println!("system memcheck over, all passed!");
         #[cfg(feature = "LOSCFG_SHELL_EXCINFO_DUMP")]
         Write_Exc_Info_To_Buf("system memcheck over, all passed!\n");
@@ -25,9 +45,9 @@ fn Los_Mem_Integrity_Check(pool: &[u8]) -> u32 {
     LOS_OK
 }
 //TODO:与上面方法重名，还不清楚使用逻辑
-fn Os_Mem_Integrity_Multi_Check(){}
+//fn Os_Mem_Integrity_Multi_Check(){}
 
-fn Os_Mem_Node_Debug_Operate(pool: &mut [u8], alloc_node: &mut Los_Mem_Dyn_Node, size: u32) {
+fn Os_Mem_Node_Debug_Operate(pool: &mut [u8], alloc_node: &mut LosMemDynNode, size: u32) {
     #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
     {
         Os_Mem_Node_Save(alloc_node);
@@ -42,11 +62,11 @@ fn Os_Mem_Node_Debug_Operate(pool: &mut [u8], alloc_node: &mut Los_Mem_Dyn_Node,
 fn Os_Mem_Info_Get(pool: *const c_void, pool_status: &mut Los_Mem_Pool_Status) -> u32 {
     unsafe {
         let pool_info = &*(pool as *const Los_Mem_Pool_Info);
-        let mut tmp_node: *mut Los_Mem_Dyn_Node = Os_Mem_End_Node(pool, pool_info.pool_size);
-        tmp_node = Os_Mem_Align(tmp_node, OS_MEM_ALIGN_SIZE);
+        let mut tmp_node: *mut LosMemDynNode = Os_Mem_End_Node(pool, pool_info.pool_size);
+        tmp_node = Os_Mem_Align!(tmp_node, OS_MEM_ALIGN_SIZE);
 
-        if !Os_Mem_Magic_Valid((*tmp_node).self_node.magic) {
-            Print_Err("wrong mem pool", pool_info, line!() as i32);
+        if !Os_Mem_Magic_Valid!((*tmp_node).self_node.myunion.extend_field.magic) {
+            println!("wrong mem pool, {:?}, {:?}", pool_info, line!() as i32);
             return LOS_NOK;
         }
 
@@ -56,22 +76,22 @@ fn Os_Mem_Info_Get(pool: *const c_void, pool_status: &mut Los_Mem_Pool_Status) -
         let mut used_node_num = 0;
         let mut free_node_num = 0;
 
-        tmp_node = Os_Mem_First_Node(pool_info);
+        tmp_node = Os_Mem_First_Node!(pool_info);
 
-        while tmp_node <= Os_Mem_End_Node(pool_info as *const _, pool_info.pool_size) {
-            if !Os_Mem_Node_Get_Used_Flag((*tmp_node).self_node.size_and_flag) {
+        while tmp_node <= Os_Mem_End_Node!(pool_info as *const _, pool_info.pool_size) {
+            if !Os_Mem_Node_Get_Used_Flag!((*tmp_node).self_node.size_and_flag) {
                 free_node_num += 1;
-                let node_size = Os_Mem_Node_Get_Size((*tmp_node).self_node.size_and_flag);
+                let node_size = Os_Mem_Node_Get_Size!((*tmp_node).self_node.size_and_flag);
                 total_free_size += node_size;
                 if (max_free_node_size < node_size) {
                     max_free_node_size = node_size;
                 }
             } else {
                 used_node_num += 1;
-                total_used_size += Os_Mem_Node_Get_Size((*tmp_node).self_node.size_and_flag);
+                total_used_size += Os_Mem_Node_Get_Size!((*tmp_node).self_node.size_and_flag);
             }
 
-            tmp_node = Os_Mem_Next_Node(tmp_node);
+            tmp_node = Os_Mem_Next_Node!(tmp_node);
         }
 
         pool_status.uw_total_used_size = total_used_size;
@@ -79,7 +99,7 @@ fn Os_Mem_Info_Get(pool: *const c_void, pool_status: &mut Los_Mem_Pool_Status) -
         pool_status.uw_max_free_node_size = max_free_node_size;
         pool_status.uw_used_node_num = used_node_num;
         pool_status.uw_free_node_num = free_node_num;
-        #[cfg(feature = "mem_task_stat")]
+        #[cfg(feature = "MEM_TASK_STAT")]
         {
             pool_status.uw_usage_water_line = pool_info.stat.mem_total_peak;
         }
@@ -115,7 +135,7 @@ fn Os_Mem_Info_Print(pool: *const c_void){
                 status.uw_usage_water_line
             );
         }
-        #[cfg(not(feature = "loscfg_mem_task_stat"))]{
+        #[cfg(not(feature = "LOSCFG_MEM_TASK_STAT"))]{
             println!(
                 "pool addr          pool size    used size     free size    max free node size   used node num     free node num"
             );
@@ -138,7 +158,7 @@ fn Os_Mem_Info_Print(pool: *const c_void){
 
 #[inline]
 fn Os_Mem_Info_Alert(pool: *const c_void, alloc_size: u32){
-    #[cfg(feature = "loscfg_mem_debug")]{
+    #[cfg(feature = "LOSCFG_MEM_DEBUG")]{
         Print_Err("---------------------------------------------------\
         --------------------------------------------------------");
         Os_Mem_Info_Print(pool);
@@ -158,7 +178,7 @@ fn Os_Mem_Info_Alert(pool: *const c_void, alloc_size: u32){
  */
 fn Os_Mem_Alloc_With_Check(pool: &mut LosMemPoolInfo, size: u32) 
     -> *mut c_void{
-    let mut alloc_node: *mut LosMemDynNode = ptr::null_mut();
+    let mut alloc_node: &mut LosMemDynNode = ptr::null_mut();
     let alloc_size: usize;
 
     #[cfg(feature = "loscfg_base_mem_node_integrity_check")]{
@@ -176,18 +196,21 @@ fn Os_Mem_Alloc_With_Check(pool: &mut LosMemPoolInfo, size: u32)
     alloc_size = Os_Mem_Align(size + Os_Mem_Node_Head_Size!(), Os_Mem_Align_Size!());
     alloc_node = Os_Mem_Find_Suitable_Free_Block(pool, alloc_size);
     if alloc_node.is_null() {
-        Os_Mem_Info_Alert(pool, alloc_size);
+        Os_Mem_Info_Alert(pool, alloc_size as u32);
         return None;
     }
-    if alloc_size + Os_Mem_Node_Head_Size!() + Os_Mem_Align_Size!() <= (*alloc_node).self_node.size_and_flag {
-        Os_Mem_Split_Node(pool, alloc_node, alloc_size);
+    unsafe {
+        if alloc_size + Os_Mem_Node_Head_Size!() + Os_Mem_Align_Size!() <= (*alloc_node).self_node.size_and_flag {
+            Os_Mem_Split_Node(pool, alloc_node, alloc_size);
+        }
+        Os_Mem_List_Delete(&mut (*alloc_node).self_node.free_node_info, first_node);
+        Os_Mem_Set_Magic_Num_And_Task_Id(alloc_node);
+        Os_Mem_Node_Set_Used_Flag!(&mut (*alloc_node).self_node.size_and_flag);
+        //TODO:该宏定义在memstat中
+        Os_Mem_Add_Used(&mut pool.stat, Os_Mem_Node_Get_Size!((*alloc_node).self_node.size_and_flag),
+                        Os_Mem_Task_Id_Get(alloc_node));
+        Os_Mem_Node_Debug_Operate(pool, alloc_node, size);
     }
-    Os_Mem_List_Delete(&mut (*alloc_node).self_node.free_node_info, first_node);
-    Os_Mem_Set_Magic_Num_And_Task_Id(alloc_node);
-    Os_Mem_Node_Set_Used_Flag(&mut (*alloc_node).self_node.size_and_flag);
-    Os_Mem_Add_Used(&mut pool.stat, Os_Mem_Node_Get_Size((*alloc_node).self_node.size_and_flag),
-                    Os_Mem_Task_Id_Get(alloc_node));
-    Os_Mem_Node_Debug_Operate(pool, alloc_node, size);
 
     #[cfg(feature = "LOSCFG_KERNEL_LMS")]
     {
@@ -207,19 +230,19 @@ fn Os_Mem_Alloc_With_Check(pool: &mut LosMemPoolInfo, size: u32)
  * Output      : node      --- pointer to the new node after realloc
  */
 #[inline]
-fn Os_Mem_ReAlloc_Smaller(pool: &mut LosMemPoolInfo, alloc_size: u32, node: &mut LosMemDynNode, nodeSize: u32){
+fn Os_Mem_ReAlloc_Smaller(pool: *mut LosMemPoolInfo, alloc_size: u32, node: *mut LosMemDynNode, nodeSize: u32){
     if alloc_size + Os_Mem_Node_Head_Size!() + Os_Mem_Align_Size!() <= node_size {
-        node.self_node.size_and_flag = node_size;
+        (*node).self_node.size_and_flag = node_size;
         Os_Mem_Split_Node(pool, node, alloc_size);
-        Os_Mem_Node_Set_Used_Flag!(node.self_node.size_and_flag)
+        Os_Mem_Node_Set_Used_Flag!(node.self_node.size_and_flag);
         
-        #[cfg(feature = "loscfg_mem_head_backup")]
+        #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
         Os_Mem_Node_Save(node);
-
+        //Os_Mem_Reduce_Used在memstat中
         Os_Mem_Reduce_Used(&mut pool.stat, node_size - alloc_size, Os_Mem_Task_Id_Get(node));
     }
 
-    #[cfg(feature = "loscfg_mem_leakcheck")]
+    #[cfg(feature = "LOSCFG_MEM_LEAKCHECK")]
     Os_Mem_Link_Register_Record(node);
 }
 
@@ -234,13 +257,13 @@ fn Os_Mem_ReAlloc_Smaller(pool: &mut LosMemPoolInfo, alloc_size: u32, node: &mut
  */
 
 #[inline]
-fn Os_Mem_Merge_Node_For_ReAlloc_Bigger(pool: &mut LosMemPoolInfo, alloc_size: u32, node: &mut LosMemDynNode, node_size: u32, next_node: &mut LosMemDynNode){
-    let first_node = (Os_Mem_Head_Addr!(pool) as *mut u8).add(Os_Dlnk_Head_Size!()) as *const ();
+fn Os_Mem_Merge_Node_For_ReAlloc_Bigger(pool: *mut LosMemPoolInfo, alloc_size: u32, node: *mut LosMemDynNode, node_size: u32, next_node: *mut LosMemDynNode){
+    unsafe {let first_node = (Os_Mem_Head_Addr!(pool) as *mut u8).add(Os_Dlnk_Head_Size!()) as *const ();}
 
-    node.self_node.size_and_flag.set(node_size);
-    Os_Mem_List_Delete(&mut next_node.self_node.free_node_info, first_node);
+    (*node).self_node.size_and_flag.set(node_size);
+    Os_Mem_List_Delete(&mut (*next_node).self_node.free_node_info, first_node);
     Os_Mem_Merge_Node(next_node);
-    if alloc_size + Os_Mem_Node_Head_Size!() + Os_Mem_Align_Size!() <= node.self_node.size_and_flag {
+    if alloc_size + Os_Mem_Node_Head_Size!() + Os_Mem_Align_Size!() <= (*node).self_node.size_and_flag {
         Os_Mem_Split_Node(pool, node, alloc_size);
     }
     //TODO:该宏定义在memstat_pri中
@@ -248,10 +271,10 @@ fn Os_Mem_Merge_Node_For_ReAlloc_Bigger(pool: &mut LosMemPoolInfo, alloc_size: u
 
     Os_Mem_Node_Set_Used_Flag!(node.self_node.size_and_flag);
 
-    #[cfg(feature = "loscfg_mem_head_backup")]
+    #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
     Os_Mem_Node_Save(node);
 
-    #[cfg(feature = "loscfg_mem_leakcheck")]
+    #[cfg(feature = "LOSCFG_MEM_LEAKCHECK")]
     Os_Mem_Link_Register_Record(node);
 }
 
@@ -285,22 +308,22 @@ fn Os_Mem_Init(pool: *mut c_void, size: u32) -> u32 {
         (*pool_info).pool = pool;
         (*pool_info).pool_size = pool_size;
 
-        Os_Dlnk_Init_Multi_Head(Os_Mem_Head_Addr(pool));
-        new_node = Os_Mem_First_Node(pool);
-        (*new_node).self_node.size_and_flag = (pool_size - ((new_node as u32) - (pool as u32)) - Os_Mem_Node_Head_Size!());
-        (*new_node).self_node.pre_node = Os_Mem_End_Node(pool, pool_size) as *mut LosMemDynNode;
-        list_node_head = Os_Mem_Head(pool, (*new_node).self_node.size_and_flag);
+        Os_Dlnk_Init_Multi_Head(Os_Mem_Head_Addr!(pool));
+        new_node = Os_Mem_First_Node!(pool);
+        (*new_node).self_node.size_and_flag.set(pool_size - ((new_node as u32) - (pool as u32)) - Os_Mem_Node_Head_Size!());
+        (*new_node).self_node.prenode = Os_Mem_End_Node!(pool, pool_size) as *mut LosMemDynNode;
+        list_node_head = Os_Mem_Head!(pool, (*new_node).self_node.size_and_flag);
         if list_node_head.is_null() {
             return LOS_NOK;
         }
 
         Los_List_Tail_Insert(list_node_head, &mut (*new_node).self_node.free_node_info);
-        end_node = os_mem_end_node(pool, pool_size) as *mut LosMemDynNode;
+        end_node = Os_Mem_End_Node!(pool, pool_size) as *mut LosMemDynNode;
         /*std::ptr::write_bytes(end_node,std::mem::size_of::<end_node>(), 0, std::mem::size_of::<LosMemDynNode>());*/
         Memset_S(nd_node,std::mem::size_of::<end_node>(), 0, std::mem::size_of::<LosMemDynNode>());
-        (*end_node).self_node.pre_node = new_node;
+        (*end_node).self_node.prenode = new_node;
         (*end_node).self_node.size_and_flag = Os_Mem_Node_Head_Size!() ;
-        Os_Mem_Node_Set_Used_Flag(&mut (*end_node).self_node.size_and_flag);
+        Os_Mem_Node_Set_Used_Flag!(&mut (*end_node).self_node.size_and_flag);
         Os_Mem_Set_Magic_Num_And_Task_Id(end_node);
 
         #[cfg(feature = "LOSCFG_MEM_TASK_STAT")]
@@ -355,7 +378,7 @@ fn Los_Mem_Init(pool: *mut c_void, mut size: u32) -> u32 {
     LOS_OK
 }
 
-fn LOS_Mem_Alloc(pool: *mut c_void, size: u32) -> *mut c_void {
+fn LOS_Mem_Alloc(pool: &mut c_void, size: u32) -> *mut c_void {
     let mut ptr: *mut c_void = std::ptr::null_mut();
     let mut int_save: u32;
 
@@ -373,7 +396,7 @@ fn LOS_Mem_Alloc(pool: *mut c_void, size: u32) -> *mut c_void {
             break;
         }
 
-        ptr = Os_Slab_Mem_Alloc(pool, size);
+        ptr = os_slab_mem_alloc(pool, size);
         if ptr.is_null() {
             ptr = Os_Mem_Alloc_With_Check(pool, size);
         }
@@ -386,12 +409,12 @@ fn LOS_Mem_Alloc(pool: *mut c_void, size: u32) -> *mut c_void {
     ptr
 }
 
-fn LOS_Mem_Alloc_Align(pool: *mut c_void, size: u32, boundary: u32) -> *mut c_void {
+fn LOS_Mem_Alloc_Align(pool: &mut c_void, size: u32, boundary: u32) -> *mut c_void {
     let mut use_size: u32;
     let mut gap_size: u32;
     let mut ptr: *mut c_void = std::ptr::null_mut();
     let mut aligned_ptr: *mut c_void = std::ptr::null_mut();
-    let mut alloc_node: *mut Los_Mem_Dyn_Node = std::ptr::null_mut();
+    let mut alloc_node: *mut LosMemDynNode = std::ptr::null_mut();
     let mut int_save: u32;
 
     if pool.is_null() || size == 0 || boundary == 0 || !Is_Pow_Two!(boundary) ||
@@ -423,14 +446,14 @@ fn LOS_Mem_Alloc_Align(pool: *mut c_void, size: u32, boundary: u32) -> *mut c_vo
         }
         /* store gapSize in address (ptr -4), it will be checked while free */
         gap_size = (aligned_ptr as u32) - (ptr as u32);
-        alloc_node = (ptr as *mut Los_Mem_Dyn_Node).offset(-1);
+        unsafe {alloc_node = (ptr as *mut LosMemDynNode).offset(-1);}
         Os_Mem_Node_Set_Aligned_Flag!((*alloc_node).self_node.size_and_flag);
 
         #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
         Os_Mem_Node_Save_With_Gap_Size(alloc_node, gap_size);
 
         Os_Mem_Node_Set_Aligned_Flag!(gap_size);
-        *((aligned_ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32) = gap_size;
+        unsafe{*((aligned_ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32) = gap_size;}
 
         ptr = aligned_ptr;
         break;
@@ -442,7 +465,7 @@ fn LOS_Mem_Alloc_Align(pool: *mut c_void, size: u32, boundary: u32) -> *mut c_vo
     ptr
 }
 
-fn Os_Do_Mem_Free(pool: *mut c_void, ptr: *mut c_void, node: &Los_Mem_Dyn_Node){
+fn Os_Do_Mem_Free(pool: *mut c_void, ptr: *mut c_void, node: &LosMemDynNode){
     Os_Mem_Check_Used_Node(pool, node);
     Os_Mem_Free_Node(node, pool);
 
@@ -456,16 +479,16 @@ fn Os_Do_Mem_Free(pool: *mut c_void, ptr: *mut c_void, node: &Los_Mem_Dyn_Node){
 fn Os_Mem_Free(pool: *mut c_void, ptr: *const c_void) -> u32 {
     let mut ret: u32 = LOS_OK;
     let mut gap_size: u32;
-    let mut node: *mut Los_Mem_Dyn_Node = std::ptr::null_mut();
+    let mut node: &mut LosMemDynNode;
 
     loop {
-        gap_size = *((ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32);
+        unsafe {gap_size = *((ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32);}
         if Os_Mem_Node_Get_Aligned_Flag!(gap_size) && Os_Mem_Node_Get_Used_Flag!(gap_size) {
-            eprintln!("[{}:{}]: gapSize:0x{:x} error", “Os_Mem_Free()”, line!(), gap_size);
+            eprintln!("[{}:{}]: gapSize:0x{:x} error", "Os_Mem_Free", line!(), gap_size);
             return ret;
         }
 
-        node = (ptr as u32 - Os_Mem_Node_Head_Size!()) as *mut Los_Mem_Dyn_Node;
+        node = (ptr as u32 - Os_Mem_Node_Head_Size!()) as &mut LosMemDynNode;
 
         if Os_Mem_Node_Get_Aligned_Flag!(gap_size) {
             gap_size = Os_Mem_Node_Get_Aligned_Gapsize!(gap_size);
@@ -473,7 +496,7 @@ fn Os_Mem_Free(pool: *mut c_void, ptr: *const c_void) -> u32 {
                 eprintln!("illegal gapSize: 0x{:x}", gap_size);
                 break;
             }
-            node = (ptr as u32 - gap_size - Os_Mem_Node_Head_Size!()) as *mut Los_Mem_Dyn_Node;
+            node = (ptr as u32 - gap_size - Os_Mem_Node_Head_Size!()) as &mut LosMemDynNode;
         }
 
         #[cfg(not(feature = "LOSCFG_MEM_HEAD_BACKUP"))]
@@ -502,7 +525,7 @@ fn Los_Mem_Free(pool: *mut c_void, ptr: *mut c_void) -> u32 {
 
     Mem_Lock!(int_save);
 
-    if Os_Slab_Mem_Free(pool, ptr) {
+    if os_slab_mem_free(pool, ptr) {
         ret = LOS_OK;
     } 
     else {
@@ -517,7 +540,7 @@ fn Los_Mem_Free(pool: *mut c_void, ptr: *mut c_void) -> u32 {
 
 fn Os_Get_Real_Ptr(pool: *const c_void, ptr: *mut c_void) -> *mut c_void {
     let mut real_ptr: *mut c_void = ptr;
-    let mut gap_size: u32 = *((ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32);
+    unsafe {let mut gap_size: u32 = *((ptr as u32 - std::mem::size_of::<u32>() as u32) as *mut u32);}
 
     if Os_Mem_Node_Get_Aligned_Flag!(gap_size) && Os_Mem_Node_Get_Used_Flag!(gap_size) {
         eprintln!("[{}:{}]: gapSize:0x{:x} error", "Os_Get_Real_Ptr()", line!(), gap_size);
@@ -535,7 +558,7 @@ fn Os_Get_Real_Ptr(pool: *const c_void, ptr: *mut c_void) -> *mut c_void {
     real_ptr
 }
 
-fn Os_Mem_Realloc(pool: *mut c_void, ptr: *mut c_void, size: u32) -> *mut c_void {
+fn Os_Mem_Realloc(pool: &mut c_void, ptr: *mut c_void, size: u32) -> *mut c_void {
     let mut node: *mut LosMemDynNode = std::ptr::null_mut();
     let mut next_node: *mut LosMemDynNode = std::ptr::null_mut();
     let mut tmp_ptr: *mut c_void = std::ptr::null_mut();
@@ -553,17 +576,18 @@ fn Os_Mem_Realloc(pool: *mut c_void, ptr: *mut c_void, size: u32) -> *mut c_void
 
     node_size = Os_Mem_Node_Get_Size!((*node).self_node.size_and_flag);
     if node_size >= alloc_size {
-        Os_Mem_Re_Alloc_Smaller(pool, alloc_size, node, node_size);
+        Os_Mem_ReAlloc_Smaller(pool, alloc_size, node, node_size);
         return ptr;
     }
 
     next_node = Os_Mem_Next_Node!(node);
-    if !Os_Mem_Node_Get_Used_Flag!((*next_node).self_node.size_and_flag) &&
+    unsafe {
+        if !Os_Mem_Node_Get_Used_Flag!((*next_node).self_node.size_and_flag) &&
         ((*next_node).self_node.size_and_flag + node_size) >= alloc_size {
-        Os_Mem_Merge_Node_For_Re_Alloc_Bigger(pool, alloc_size, node, node_size, next_node);
+        Os_Mem_Merge_Node_For_ReAlloc_Bigger(pool, alloc_size, node, node_size, next_node);
         return ptr;
     }
-
+    }
     tmp_ptr = Os_Mem_Alloc_With_Check(pool, size);
     if !tmp_ptr.is_null() {
         let gap_size: u32 = (ptr as u32 - real_ptr as u32);
