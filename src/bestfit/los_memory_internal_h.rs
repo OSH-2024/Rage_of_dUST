@@ -1,5 +1,5 @@
-include!("mempool.rs");
-
+use std::ptr;
+use crate::LosMoudleId::LosModMem;
 use std::cell::Cell;
 //使用 Cell 可变性容器,通过 .get 方法获取值，.set 方法来修改值
 use std::mem;
@@ -281,14 +281,12 @@ fn Los_Spin_Unlock_Restore(lock: *mut SpinLockS, int_save: u32) ->() {
     Los_Int_Restore(int_save);
 }
 
-//#[macro_export]
 macro_rules! Mem_Lock {
     ($int_save: expr) =>{
         Los_Spin_Lock_Save(std::ptr::addr_of_mut!(g_mem_spin), &mut ($int_save));
     };
 }
 
-//#[macro_export]
 macro_rules! Mem_Unlock {
     ($int_save: expr) =>{
         Los_Spin_Unlock_Restore(std::ptr::addr_of_mut!(g_mem_spin), $int_save);
