@@ -46,23 +46,23 @@ macro_rules! Os_Back_Trace {
 }
 
 //los_hwi.c 353
-fn Int_Active()->u32{
-    let int_count:u32;
-    let int_save:u32=Los_Int_Lock();
+fn Int_Active() -> u32 {
+    let int_count: u32;
+    let int_save: u32 = Los_Int_Lock();
 
     //TODO
 }
 
 //los_hwi.h 64
-macro_rules! Os_Int_Active{
-    ()=>{
+macro_rules! Os_Int_Active {
+    () => {
         Int_Active()
     };
 }
 
 //los_hwi.h 74
-macro_rules! Os_Int_Inactive{
-    ()=>{
+macro_rules! Os_Int_Inactive {
+    () => {
         !Os_Int_Active!()
     };
 }
@@ -148,11 +148,9 @@ fn Os_Mem_Set_Magic_Num_And_Task_Id(node: *mut LosMemDynNode) {
 
         if !run_task.is_null() && Os_Int_Inactive!() {
             Os_Mem_Taskid_Set(node, (*run_task).task_id);
-        } 
-        else{
+        } else {
             Os_Mem_Taskid_Set(node, 12);
         }
-        
     }
 }
 
@@ -160,18 +158,21 @@ fn Os_Mem_Set_Magic_Num_And_Task_Id(node: *mut LosMemDynNode) {
 //rust函数定义顺序不影响其可见性和使用性，原文在此处提前声明2098行的OsMemFindNodeCtrl，rust中不需要
 //154行
 //#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
-const CHECKSUM_MAGICNUM: u32 = 0xDEADBEEF;
+macro_rules! Checksum_Magicnum {
+    () => {
+        0xDEADBEEF
+    };
+}
 
 //#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 macro_rules! Os_Mem_Node_Checksum_Calculate {
     ($ctl_node:expr) => {
-        let ctl_node = $ctl_node; //TODO:
-        ((ctl_node.free_node_info.pst_prev)
-            ^ (ctl_node.free_node_info.pst_next)
-            ^ (ctl_node.pre_node)
-            ^ ctlNode.gap_size
-            ^ ctlNode.size_and_flag
-            ^ CHECKSUM_MAGICNUM)
+        ((((*$ctl_node).myunion.free_node_info.pst_prev) as u32)
+            ^ (((*$ctl_node).myunion.free_node_info.pst_next) as u32)
+            ^ (((*$ctl_node).prenode) as u32)
+            ^ ((*$ctl_node).gapsize.get())
+            ^ ((*$ctl_node).size_and_flag.get())
+            ^ Checksum_Magicnum!())
     };
 }
 
@@ -182,16 +183,18 @@ fn Os_Mem_Disp_Ctl_Node(ctl_node: *mut LosMemCtlNode) {
 
     checksum = Os_Mem_Node_Checksum_Calculate!(ctl_node);
 
-    println!("node:{:p} checksum={:p}[{:p}] freeNodeInfo.pstPrev={:p} ",
-           "freeNodeInfo.pstNext={:p} preNode={:p} gapSize=0x{:x} sizeAndFlag=0x{:x}",
-           ctl_node,
-           ctl_node.checksum,
-           checksum,//TODO:
-           ctl_node->free_node_info.pst_prev,
-           ctl_node->free_node_info.pst_next,
-           ctl_node->pre_node,
-           ctl_node->gap_size,
-           ctl_node->size_and_flag);
+    println!(
+        "node:{:p} checksum={:x}[{:x}] freeNodeInfo.pstPrev={:p}
+        freeNodeInfo.pstNext={:p} preNode={:p} gapSize=0x{:x} sizeAndFlag=0x{:x}",
+        ctl_node,
+        (*ctl_node).checksum.get(),
+        checksum,
+        (*ctl_node).myunion.free_node_info.pst_prev,
+        (*ctl_node).myunion.free_node_info.pst_next,
+        (*ctl_node).prenode,
+        (*ctl_node).gapsize.get(),
+        (*ctl_node).size_and_flag.get()
+    );
 }
 
 //182行
@@ -256,7 +259,10 @@ unsafe fn Os_Mem_Disp_Wild_Pointer_Msg(node: *mut LosMemDynNode, ptr: *mut std::
     );
     println!(
         "the pointer should be: {:p}",
-        node.offset(((*node).self_node.gapsize.get() + std::mem::size_of::<LosMemDynNode>() as u32) as isize)
+        node.offset(
+            ((*node).self_node.gapsize.get() + std::mem::size_of::<LosMemDynNode>() as u32)
+                as isize
+        )
     );
     println!("the pointer given is: {:p}", ptr);
     println!("PROBABLY A WILD POINTER");
@@ -267,13 +273,15 @@ unsafe fn Os_Mem_Disp_Wild_Pointer_Msg(node: *mut LosMemDynNode, ptr: *mut std::
 //237行
 //#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_Checksum_Set(ctl_node: *mut LosMemCtlNode) {
-    (*ctl_node).checksum = Os_Mem_Node_Checksum_Calculate!(ctl_node);
+    (*ctl_node)
+        .checksum
+        .set(Os_Mem_Node_Checksum_Calculate!(ctl_node));
 }
 
 //242行
 //#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
 fn Os_Mem_Checksum_Verify(ctl_node: *mut LosMemCtlNode) -> bool {
-    (*ctl_node).checksum == Os_Mem_Node_Checksum_Calculate!(ctl_node)
+    (*ctl_node).checksum.get() == Os_Mem_Node_Checksum_Calculate!(ctl_node)
 }
 
 //247行
@@ -321,7 +329,7 @@ fn Os_Mem_Backup_Setup_4_Next(pool: *mut std::ffi::c_void, node: *mut LosMemDynN
         return 1; //LOS_NOK
     }
 
-    if !Os_Mem_Checksum_Verify(&mut (*node).backup_node as *mut LosMemCtlNode) { 
+    if !Os_Mem_Checksum_Verify(&mut (*node).backup_node as *mut LosMemCtlNode) {
         (*node).backup_node.myunion.free_node_info.pst_next =
             (*node_next).self_node.free_node_info.pst_next;
         (*node).backup_node.myunion.free_node_info.pst_prev =
