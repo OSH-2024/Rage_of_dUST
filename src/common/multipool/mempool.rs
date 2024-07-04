@@ -2,10 +2,6 @@ use std::ptr;
 use crate::LosMoudleId::LosModMem;
 
 include!("mempool_h.rs");
-include!("mem_lock_unlock_h.rs");
-
-#[macro_use]
-mod mem_lock_unlock_h;
 
 static mut G_POOL_HEAD: *mut std::ffi::c_void = ptr::null_mut();
 //get pool size function by ourselves
