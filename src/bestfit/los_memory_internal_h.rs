@@ -228,7 +228,7 @@ macro_rules! Os_Mem_Middle_Addr{
 
 macro_rules! Os_Mem_Set_Magic{
     ($value: expr) => {
-        ($value = (&$value as *const _ as usize) ^ ((u32::MAX) as usize) )//////
+        ($value = ((&$value as *const _ as usize) ^ ((u32::MAX) as usize)) as u32)//////
     };
 }
 
