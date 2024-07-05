@@ -25,12 +25,13 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * --------------------------------------------------------------------------- */
-extern crate libc;
-use libc::{c_void, size_t};
+// extern crate libc;
+use libc::c_void;
 use std::convert::TryInto;
+
 extern "C" {
     // 声明 C 库中的 memset 函数
-    fn memset(s: *mut c_void, c: i32, n: size_t) -> *mut c_void;
+    fn memset(dest: *mut std::ffi::c_void, c: i32, n: u64) -> *mut std::ffi::c_void;
 }
 //头文件los_membox.h
 fn los_membox_aligned(mem_addr: usize) -> usize {
@@ -49,7 +50,25 @@ pub struct LosMemboxInfo {
     // #[cfg(LOSCFG_KERNEL_MEMBOX_STATIC)] //TODO
     pub stFreeList: LosMemboxNode, // The list of free memory block node in the static memory pool
 }
+macro_rules! Os_Membox_Next {
+    ($addr:expr,$blk_size:expr) => {
+        ($addr as *mut u8).offset($blk_size as isize) as *mut std::ffi::c_void as *mut LosMemboxNode
+    };
+}
 //securectype.h
+//408
+macro_rules! securec_likely {
+    ($x:expr) => {
+        ($x) //__builtin_expect(!!(x), 1)
+    };
+}
+
+macro_rules! securec_unlikely {
+    ($x:expr) => {
+        ($x) //__builtin_expect(!!(x), 0)
+    };
+}
+
 macro_rules! securec_mem_max_len {
     () => {{
         0x7fffffffu64
@@ -57,8 +76,8 @@ macro_rules! securec_mem_max_len {
 }
 //securecutil.h
 //参考https://course.rs/advance/unsafe/inline-asm.html
-use std::arch::asm;
 macro_rules! securec_memory_barrier {
+    use std::arch::asm;
     ($dest:expr) => {{
         unsafe {
             asm!("mfence", "memory", "volatile");
@@ -69,34 +88,34 @@ macro_rules! securec_memset_func_opt {
     ($dest:expr,$value:expr,$count:expr) => {{
         //此处调用lib/libc/string/memset.c中的memset函数
         unsafe {
-            libc::memset($dest as *mut libc::c_void, $value, $count);
+            libc::memset($dest as *mut std::ffi::c_void, $value, $count);
         }
     }};
 }
 macro_rules! securec_memset_prevent_dse {
     ($dest:expr,$value:expr,$count:expr) => {{
-        securec_memset_func_opt!($dest, $value, $count as usize);
+        securec_memset_func_opt!($dest, $value, $count);
         securec_memory_barrier!($dest);
     }};
 }
 
 //memset_s.c
 macro_rules! securec_memset_param_ok {
-    ($dest:expr, $destMax:expr, $count:expr) => {{
-        (securec_likely!($destMax) <= securec_mem_max_len!())
-            && (($dest) != std::ptr::null_mut())
-            && (($count) <= ($destMax))
+    ($dest:expr, $dest_max:expr, $count:expr) => {{
+        (securec_likely!($dest_max) <= securec_mem_max_len!())
+            && (!($dest).is_null())
+            && (($count) <= ($dest_max))
     }};
 }
-unsafe fn memset_s(dest: *mut (), destMax: u64, c: i32, count: u64) -> i32 {
-    if securec_memset_param_ok!(dest, destMax, count) {
-        securec_memset_prevent_dse!(dest, c, count as usize);
+unsafe fn memset_s(dest: *mut std::ffi::c_void, dest_max: u64, c: i32, count: u64) -> i32 {
+    if securec_memset_param_ok!(dest, dest_max, count) {
+        securec_memset_prevent_dse!(dest, c, count);
         return 0; //EOK
     }
     return 0;
     //TODO
     /* Meet some runtime violation, return error code */
-    // return SecMemsetError(dest, destMax, c);
+    // return SecMemsetError(dest, dest_max, c);
 }
 
 //对应c中LOSCFG_AARCH64的宏定义
@@ -147,7 +166,7 @@ fn membox_unlock(state: u32) {
     }
 }
 
-unsafe fn os_check_box_mem(boxInfo: *mut LosMemboxInfo, node: *mut ()) -> u32 {
+unsafe fn os_check_box_mem(boxInfo: *mut LosMemboxInfo, node: *mut std::ffi::c_void) -> u32 {
     let mut offset;
     if (*boxInfo).uwBlkSize == 0 {
         return 1; //LOS_NOK
@@ -166,7 +185,7 @@ unsafe fn os_check_box_mem(boxInfo: *mut LosMemboxInfo, node: *mut ()) -> u32 {
     os_membox_check_magic(node)
 }
 
-unsafe fn los_memboxinit(pool: *mut (), poolSize: u32, blkSize: u32) -> u32 {
+unsafe fn los_memboxinit(pool: *mut std::ffi::c_void, poolSize: u32, blkSize: u32) -> u32 {
     let mut boxInfo = pool as *mut LosMemboxInfo;
     let mut node: *mut LosMemboxNode;
     let mut index: u32;
@@ -219,7 +238,7 @@ unsafe fn los_memboxinit(pool: *mut (), poolSize: u32, blkSize: u32) -> u32 {
 
     return 0; //LOS_OK
 }
-unsafe fn los_membox_alloc(pool: *mut ()) -> *mut () {
+unsafe fn los_membox_alloc(pool: *mut std::ffi::c_void) -> *mut std::ffi::c_void {
     let mut boxInfo = pool as *mut LosMemboxInfo;
     let mut node: *mut LosMemboxNode;
     let mut nodeTmp: Option<*mut LosMemboxNode> = None;
@@ -247,7 +266,7 @@ unsafe fn los_membox_alloc(pool: *mut ()) -> *mut () {
         return core::ptr::null_mut();
     }
 }
-unsafe fn los_membox_free(pool: *mut (), Box: *mut ()) -> u32 {
+unsafe fn los_membox_free(pool: *mut std::ffi::c_void, Box: *mut std::ffi::c_void) -> u32 {
     let mut boxInfo = pool as *mut LosMemboxInfo;
     let mut node: *mut LosMemboxNode;
     let mut ret: u32 = 1; //LOS_NOK
@@ -273,7 +292,7 @@ unsafe fn los_membox_free(pool: *mut (), Box: *mut ()) -> u32 {
     return ret;
 }
 
-unsafe fn los_membox_clr(pool: *mut (), Box: *mut ()) {
+unsafe fn los_membox_clr(pool: *mut std::ffi::c_void, Box: *mut std::ffi::c_void) {
     let mut boxInfo = pool as *mut LosMemboxInfo;
     let mut intSave: u32;
 
@@ -291,7 +310,7 @@ unsafe fn los_membox_clr(pool: *mut (), Box: *mut ()) {
     membox_unlock(intSave);
 }
 
-unsafe fn los_show_box(pool: *mut ()) {
+unsafe fn los_show_box(pool: *mut std::ffi::c_void) {
     let mut index: u32;
     let mut intSave: u32;
     let mut boxInfo = pool as *mut LosMemboxInfo;
@@ -302,13 +321,13 @@ unsafe fn los_show_box(pool: *mut ()) {
     }
 
     membox_lock(intSave);
-    print_info(
-        "membox({:p},0x{:x},0x{:x}):\r\n",
+    println!(
+        "membox({:p},0x{:x},0x{:x}):\r",
         pool,
         (*boxInfo).uwBlkSize,
         (*boxInfo).uwBlkNum,
     );
-    print_info("free node list:\r\n");
+    println!("free node list:\r");
 
     index = 0;
     if (*boxInfo).stFreeList.pstNext != None {
@@ -318,25 +337,25 @@ unsafe fn los_show_box(pool: *mut ()) {
         };
     }
     while (*boxInfo).stFreeList.pstNext != None {
-        print_info("({},{:p})\r\n", index, node);
+        println!("({},{:p})\r", index, node);
         node = match (*node).pstNext {
             Some(p) => p,
             None => break,
         };
         index += 1;
     }
-    print_info("all node list:\r\n");
+    println!("all node list:\r");
     node = boxInfo.wrapping_add(1) as *mut LosMemboxNode;
     index = 0;
     while index < (*boxInfo).uwBlkNum {
-        print_info("({},{:p},{:p})\r\n", index, node, (*node).pstNext);
+        println!("({},{:p},{:p})\r", index, node, (*node).pstNext);
         index += 1;
-        node = os_membox_next(node, (*boxInfo).uwBlkSize);
+        node = Os_Membox_Next!(node, (*boxInfo).uwBlkSize);
     }
     membox_unlock(intSave);
 }
 unsafe fn los_membox_statistics_get(
-    boxMem: *const (),
+    boxMem: *const std::ffi::c_void,
     maxBlk: *mut u32,
     blkCnt: *mut u32,
     blkSize: *mut u32,
