@@ -33,14 +33,14 @@ use std::convert::TryInto;
 //     fn memset(dest: *mut std::ffi::c_void, c: i32, n: usize) -> *mut std::ffi::c_void;
 // }
 //头文件los_membox.h
-fn los_membox_aligned(mem_addr: usize) -> usize {
-    let size_of_usize = core::mem::size_of::<usize>();
-    (mem_addr + size_of_usize - 1) & !(size_of_usize - 1)
+fn los_membox_aligned(mem_addr: u32) -> u32 {
+    let size_of_u32 = core::mem::size_of::<u32>();
+    (mem_addr + size_of_u32 as u32 - 1) & !(size_of_u32 as u32 - 1)
 }
 pub struct LosMemboxNode {
     pub pstNext: Option<*mut LosMemboxNode>,
 }
-pub const OS_MEMBOX_NODE_HEAD_SIZE: usize = core::mem::size_of::<LosMemboxNode>();
+pub const OS_MEMBOX_NODE_HEAD_SIZE: u32 = core::mem::size_of::<LosMemboxNode>() as u32;
 
 pub struct LosMemboxInfo {
     pub uwBlkSize: u32, // The memory block size of the static memory pool
@@ -138,7 +138,7 @@ unsafe fn os_membox_user_addr<T>(addr: *mut T) -> *mut std::ffi::c_void {
     (addr as *mut u8).offset(OS_MEMBOX_NODE_HEAD_SIZE as isize) as *mut std::ffi::c_void
 }
 unsafe fn os_membox_node_addr<T>(addr: *mut T) -> *mut LosMemboxNode {
-    (((addr as *mut u8).wrapping_sub(OS_MEMBOX_NODE_HEAD_SIZE)) as *mut std::ffi::c_void)
+    (((addr as *mut u8).offset(-1 * OS_MEMBOX_NODE_HEAD_SIZE as isize)) as *mut std::ffi::c_void)
         as *mut LosMemboxNode
 }
 
@@ -205,7 +205,7 @@ unsafe fn los_memboxinit(pool: *mut std::ffi::c_void, poolSize: u32, blkSize: u3
 
     // membox_lock(intSave);
 
-    (*boxInfo).uwBlkSize = los_membox_aligned(blkSize as usize + OS_MEMBOX_NODE_HEAD_SIZE)
+    (*boxInfo).uwBlkSize = los_membox_aligned(blkSize + OS_MEMBOX_NODE_HEAD_SIZE)
         .try_into()
         .unwrap();
     (*boxInfo).uwBlkNum =
@@ -304,7 +304,7 @@ unsafe fn los_membox_clr(pool: *mut std::ffi::c_void, Box: *mut std::ffi::c_void
         std::ptr::write_bytes(
             Box,
             0,
-            (*boxInfo).uwBlkSize as usize - OS_MEMBOX_NODE_HEAD_SIZE,
+            (*boxInfo).uwBlkSize as usize - OS_MEMBOX_NODE_HEAD_SIZE as usize,
         );
     }
     // memset_s(
