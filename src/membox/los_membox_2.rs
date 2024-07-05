@@ -33,7 +33,7 @@ use std::convert::TryInto;
 //     fn memset(dest: *mut std::ffi::c_void, c: i32, n: usize) -> *mut std::ffi::c_void;
 // }
 //头文件los_membox.h
-fn los_membox_aligned(mem_addr: u32) -> u32 {
+unsafe fn los_membox_aligned(mem_addr: u32) -> u32 {
     let size_of_u32 = core::mem::size_of::<u32>();
     (mem_addr + size_of_u32 as u32 - 1) & !(size_of_u32 as u32 - 1)
 }
@@ -199,31 +199,37 @@ unsafe fn los_memboxinit(pool: *mut std::ffi::c_void, poolSize: u32, blkSize: u3
     }
 
     //usize 转 u32
+    println!("poolSize = {} , core::mem::size_of::<LosMemboxInfo>() = {}",poolSize,core::mem::size_of::<LosMemboxInfo>());
     if poolSize < core::mem::size_of::<LosMemboxInfo>().try_into().unwrap() {
         return 1; //LOS_NOK
     }
 
     // membox_lock(intSave);
-
+    println!("OS_MEMBOX_NODE_HEAD_SIZE={}",OS_MEMBOX_NODE_HEAD_SIZE);
     (*boxInfo).uwBlkSize = los_membox_aligned(blkSize + OS_MEMBOX_NODE_HEAD_SIZE)
         .try_into()
         .unwrap();
     (*boxInfo).uwBlkNum =
         (poolSize - core::mem::size_of::<LosMemboxInfo>() as u32) / (*boxInfo).uwBlkSize;
     (*boxInfo).uwBlkCnt = 0;
+    println!("(*boxInfo).uwBlkSize = {} , (*boxInfo).uwBlkNum = {}",(*boxInfo).uwBlkSize,(*boxInfo).uwBlkNum);
 
     if (*boxInfo).uwBlkNum == 0 || (*boxInfo).uwBlkSize < blkSize {
         // membox_unlock(intSave);
         return 1; //LOS_NOK
     }
-
+    println!("boxInfo = {:p}",boxInfo);
+    println!("boxInfo.wrapping_add(1) = {:p}",boxInfo.wrapping_add(1));
     node = boxInfo.wrapping_add(1) as *mut LosMemboxNode;
+    println!("node = {:p}",node);
     (*boxInfo).stFreeList.pstNext = Some(node);
 
     index = 0;
     while index < ((*boxInfo).uwBlkNum - 1) {
         //TODO
-        // (*node).pstNext = os_membox_next(node, (*boxInfo).uwBlkSize);
+        (*node).pstNext = Some(Os_Membox_Next!(node, (*boxInfo).uwBlkSize));
+        println!("(*node).pstNext.unwrap() = {:p}",(*node).pstNext.unwrap());
+        //println!("{}",(*node).pstNext);
         node = match (*node).pstNext {
             Some(p) => p,
             None => return 1, //LOS_NOK
@@ -284,6 +290,8 @@ unsafe fn los_membox_free(pool: *mut std::ffi::c_void, Box: *mut std::ffi::c_voi
         (*node).pstNext = (*boxInfo).stFreeList.pstNext;
         (*boxInfo).stFreeList.pstNext = Some(node);
         (*boxInfo).uwBlkCnt -= 1;
+        ret = 0;
+        //LOS_OK
         break;
     }
     // membox_unlock(intSave);
