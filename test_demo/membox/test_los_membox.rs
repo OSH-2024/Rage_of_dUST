@@ -1,4 +1,3 @@
-
 include!("membox.rs");
 
  fn main() {
@@ -6,7 +5,7 @@ include!("membox.rs");
     {
         let mut mem: *mut u32 = std::ptr::null_mut();
         let blk_size: u32 = 16;
-        //这个blk_size不能轻易改！！！
+        //the blk_size must be 2^n
         let box_size: u32 = 100;
         let mut box_mem: [u64; 1000] = [0; 1000];
         let mut ret: u32 = 0;

@@ -59,7 +59,7 @@ struct Moreinfo{
 struct LosMemDynNode {
     self_node: LosMemCtlNode,
 
-    //#[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
+    #[cfg(feature = "LOSCFG_MEM_HEAD_BACKUP")]
     backup_node: LosMemCtlNode
 }
 
@@ -80,9 +80,13 @@ macro_rules! Os_Multi_Dlnk_Num{
 }
 
 //defined in los_multipledlinkhead_pri.h
+
+
 struct LosMultipleDlinkHead{
     list_head:  [LosDlList; Os_Multi_Dlnk_Num!()]
 }
+
+
 //functions in los_multipledlinkhead.c
 pub const los_invalid_bit_index: u32 = 32;
 pub const os_bitmap_mask: u32 = 0x1f;

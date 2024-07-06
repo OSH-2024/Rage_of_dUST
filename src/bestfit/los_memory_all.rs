@@ -1124,7 +1124,8 @@ fn Os_Mem_Check_Used_Node(pool: *const std::ffi::c_void, node: *mut LosMemDynNod
                 println!("The previous node:{:?} has been damaged!", pre_node);
             }
         }
-    }
+}
+
 #[cfg(not(feature = "LOSCFG_MEM_DEBUG"))]
 fn Os_Mem_Check_Used_Node(pool: *const std::ffi::c_void, node: *mut LosMemDynNode)->()
 {
@@ -1708,7 +1709,7 @@ fn Los_Mem_Init(pool: *mut std::ffi::c_void, mut size: u32) -> u32 {
     }
     Mem_Unlock!(int_save);
 
-    //Los_Trace!(MEM_INFO_REQ, pool);
+    Los_Trace!(MEM_INFO_REQ, pool);
     LOS_OK
 }
 
@@ -1757,7 +1758,7 @@ fn Los_Mem_Alloc(pool: *mut std::ffi::c_void, size: u32) -> *mut std::ffi::c_voi
 
     Mem_Unlock!(int_save);
 
-    //Los_Trace!(Mem_Alloc, pool, ptr as u32, size);
+    Los_Trace!(Mem_Alloc, pool, ptr as u32, size);
     ptr
 }
 
@@ -1889,7 +1890,7 @@ fn Los_Mem_Free(pool: *mut std::ffi::c_void, ptr: *mut std::ffi::c_void) -> u32 
 
     Mem_Unlock!(int_save);
 
-    //Los_Trace!(MEM_FREE, pool, ptr as u32);
+    Los_Trace!(MEM_FREE, pool, ptr as u32);
     ret
 }
 

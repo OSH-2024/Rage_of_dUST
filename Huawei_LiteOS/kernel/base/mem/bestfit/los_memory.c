@@ -1247,7 +1247,7 @@ VOID OsMemIntegrityMultiCheck(VOID)
 }
 #endif
 
-STATIC INLINE VOID OsMemNodeDebugOperate(VOID *pool, LosMemDynNode *allocNode, UINT32 size)
+STATIC INLINE VOID OsMemNodeDebugOperate(VOID *p ool, LosMemDynNode *allocNode, UINT32 size)
 {
 #ifdef LOSCFG_MEM_HEAD_BACKUP
     OsMemNodeSave(allocNode);

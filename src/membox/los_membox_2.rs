@@ -46,7 +46,7 @@ pub struct LosMemboxInfo {
     pub uwBlkSize: u32, // The memory block size of the static memory pool
     pub uwBlkNum: u32,  // The total memory block number of the static memory pool
     pub uwBlkCnt: u32,  // The number of allocated memory blocks in the static memory pool
-    // #[cfg(LOSCFG_KERNEL_MEMBOX_STATIC)] //TODO
+    // #[cfg(LOSCFG_KERNEL_MEMBOX_STATIC)] 
     pub stFreeList: LosMemboxNode, // The list of free memory block node in the static memory pool
 }
 macro_rules! Os_Membox_Next {
@@ -324,7 +324,7 @@ unsafe fn los_membox_clr(pool: *mut std::ffi::c_void, Box: *mut std::ffi::c_void
     // membox_unlock(intSave);
 }
 
-unsafe fn los_show_box(pool: *mut std::ffi::c_void) {
+fn los_show_box(pool: *mut std::ffi::c_void) {
     let mut index: u32;
     // let mut intSave: u32;
     let mut boxInfo = pool as *mut LosMemboxInfo;

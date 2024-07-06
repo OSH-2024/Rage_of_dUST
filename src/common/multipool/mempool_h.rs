@@ -8,9 +8,6 @@ struct LosMemPoolInfo {
     pool: *mut std::ffi::c_void,//begining address of this pool
     next_pool: *mut std::ffi::c_void, 
     pool_size: u32
-    // Add other fields if necessary
-    //memstat add after changing memstat
-    //slab related
 }
 
 pub const LOS_OK: u32 = 0;
