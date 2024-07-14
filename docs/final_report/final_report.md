@@ -21,9 +21,6 @@ Rust 是为了解决系统编程领域的安全性问题, 而设计的一门面�
 内存管理单元的结构如下：
 
 bestfit/bestfit_little: 基于最佳适配算法实现动态内存管理。 slab：实现了Slab分配器，对于内核对象和小内存块的管理更加高效。 common： 实现内存管理的通用功能。 memstat：统计内存使用量、空闲内存量等。 multipool：提供了多内存池的管理功能。 membox： 静态内存管理，固定大小的内存块分配
-
-[![img](https://github.com/OSH-2024/Rage_of_dUST/raw/main/docs/final_report/figs/MMU_overview.png)](https://github.com/OSH-2024/Rage_of_dUST/blob/main/docs/final_report/figs/MMU_overview.png)
-
 ### 内存管理机制简介
 
 **内存管理单元（MMU）**
